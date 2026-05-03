@@ -5,6 +5,7 @@ import {usePathname} from 'next/navigation';
 import {Compass, FileText, LayoutDashboard, Upload, Users} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
+// i
 const nav = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/clients', label: 'Clients', icon: Users},
