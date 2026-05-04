@@ -12,15 +12,8 @@ import {
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  balanceForClient,
-  clientPaymentStatus,
-  enrichPayment,
-  getClient,
-  getTrip,
-  paymentsForClient,
-  totalPaidForClient,
-} from "@/lib/compute";
+import { createCompute } from "@/lib/compute";
+import { loadAppData } from "@/lib/load-app-data";
 import { formatDate, formatDateTime, formatZAR } from "@/lib/utils";
 
 export default async function ClientPage({
@@ -29,6 +22,16 @@ export default async function ClientPage({
   params: Promise<{ clientId: string }>;
 }) {
   const { clientId } = await params;
+  const app = await loadAppData();
+  const {
+    balanceForClient,
+    clientPaymentStatus,
+    enrichPayment,
+    getClient,
+    getTrip,
+    paymentsForClient,
+    totalPaidForClient,
+  } = createCompute(app);
   const client = getClient(clientId);
   if (!client) notFound();
   const trip = getTrip(client.tripId)!;

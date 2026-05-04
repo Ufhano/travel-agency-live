@@ -8,10 +8,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { allPaymentsEnriched } from "@/lib/compute";
+import { createCompute } from "@/lib/compute";
+import { loadAppData } from "@/lib/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
 
-export default function InvoicesPage() {
+export const dynamic = "force-dynamic";
+
+export default async function InvoicesPage() {
+  const data = await loadAppData();
+  const { allPaymentsEnriched } = createCompute(data);
   const rows = allPaymentsEnriched();
 
   return (

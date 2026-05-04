@@ -20,13 +20,8 @@ import {
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { TripStatusBadge } from "@/components/trip-status-badge";
-import {
-  aggregateTrip,
-  balanceForClient,
-  clientPaymentStatus,
-  displayTripStatus,
-  totalPaidForClient,
-} from "@/lib/compute";
+import { createCompute } from "@/lib/compute";
+import { loadAppData } from "@/lib/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
 
 export default async function TripPage({
@@ -35,6 +30,14 @@ export default async function TripPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
+  const data = await loadAppData();
+  const {
+    aggregateTrip,
+    balanceForClient,
+    clientPaymentStatus,
+    displayTripStatus,
+    totalPaidForClient,
+  } = createCompute(data);
   const agg = aggregateTrip(tripId);
   if (!agg) notFound();
 

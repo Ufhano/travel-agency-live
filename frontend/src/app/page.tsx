@@ -20,16 +20,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TripStatusBadge } from "@/components/trip-status-badge";
-import {
-  aggregateTrip,
-  buildKeyOperationalInsights,
-  dashboardSummary,
-  displayTripStatus,
-} from "@/lib/compute";
+import { createCompute } from "@/lib/compute";
+import { loadAppData } from "@/lib/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const data = await loadAppData();
+  const {
+    aggregateTrip,
+    buildKeyOperationalInsights,
+    dashboardSummary,
+    displayTripStatus,
+  } = createCompute(data);
   const summary = dashboardSummary();
   const keyInsights = buildKeyOperationalInsights();
 

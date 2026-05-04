@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { InvoicePrintBody } from "@/components/invoice-print-body";
 import { InvoiceToolbar } from "@/components/invoice-toolbar";
-import { enrichPayment, getPaymentById } from "@/lib/compute";
+import { createCompute } from "@/lib/compute";
+import { loadAppData } from "@/lib/load-app-data";
 
 export default async function InvoiceDetailPage({
   params,
@@ -9,6 +10,8 @@ export default async function InvoiceDetailPage({
   params: Promise<{ paymentId: string }>;
 }) {
   const { paymentId } = await params;
+  const app = await loadAppData();
+  const { enrichPayment, getPaymentById } = createCompute(app);
   const payment = getPaymentById(paymentId);
   if (!payment) notFound();
   const ctx = enrichPayment(payment);
