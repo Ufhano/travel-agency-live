@@ -20,8 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TripStatusBadge } from "@/components/trip-status-badge";
-import { createCompute } from "@/lib/compute";
-import { loadAppData } from "@/lib/load-app-data";
+import { createCompute } from "@backend/compute";
+import { loadAppData } from "@backend/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 

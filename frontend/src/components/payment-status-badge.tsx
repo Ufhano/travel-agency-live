@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import type { ClientPaymentStatus } from "@/lib/types";
+import type { ClientPaymentStatus } from "@backend/types";
 import { Badge } from "@/components/ui/badge";
 
 const map: Record<

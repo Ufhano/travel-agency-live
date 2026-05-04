@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatZAR } from "@/lib/utils";
-import type { TripAggregate } from "@/lib/types";
+import type { TripAggregate } from "@backend/types";
 
 export function DashboardChart({ rows }: { rows: TripAggregate[] }) {
   const data = rows.map((r) => ({

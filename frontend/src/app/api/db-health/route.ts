@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSql } from "@/lib/db";
+import { getSql } from "@backend/db";
 
 /** Quick check that `DATABASE_URL` works (returns 200 `{ ok: true }` when `SELECT 1` succeeds). */
 export async function GET() {

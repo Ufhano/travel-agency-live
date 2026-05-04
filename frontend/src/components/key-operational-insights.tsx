@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertCircle, AlertTriangle, CircleCheck } from "lucide-react";
-import type { KeyOperationalInsight } from "@/lib/types";
+import type { KeyOperationalInsight } from "@backend/types";
 import { cn } from "@/lib/utils";
 
 const toneMessage: Record<KeyOperationalInsight["tone"], string> = {

@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { InvoicePrintBody } from "@/components/invoice-print-body";
 import { InvoiceToolbar } from "@/components/invoice-toolbar";
-import { createCompute } from "@/lib/compute";
-import { loadAppData } from "@/lib/load-app-data";
+import { createCompute } from "@backend/compute";
+import { loadAppData } from "@backend/load-app-data";
 
 export default async function InvoiceDetailPage({
   params,

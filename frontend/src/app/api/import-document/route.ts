@@ -2,9 +2,9 @@ import mammoth from 'mammoth';
 import {NextResponse} from 'next/server';
 import {PDFParse} from 'pdf-parse';
 
-import type {ImportExtractResult} from '@/lib/import-parse';
-import {ensurePdfJsWorker} from '@/lib/pdf-worker';
-import {parseSpreadsheetImport, parseUnstructuredImportText} from '@/lib/import-parse';
+import type {ImportExtractResult} from '@backend/import-parse';
+import {ensurePdfJsWorker} from '@backend/pdf-worker';
+import {parseSpreadsheetImport, parseUnstructuredImportText} from '@backend/import-parse';
 
 export const runtime = 'nodejs';
 

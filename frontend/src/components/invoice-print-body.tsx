@@ -1,4 +1,4 @@
-import type { PaymentWithContext } from "@/lib/types";
+import type { PaymentWithContext } from "@backend/types";
 import { formatDate, formatDateTime, formatZAR } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 

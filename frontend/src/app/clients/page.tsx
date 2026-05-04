@@ -9,8 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
-import { createCompute } from "@/lib/compute";
-import { loadAppData } from "@/lib/load-app-data";
+import { createCompute } from "@backend/compute";
+import { loadAppData } from "@backend/load-app-data";
 import { formatZAR } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";

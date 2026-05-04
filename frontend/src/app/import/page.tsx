@@ -3,7 +3,7 @@
 import {useCallback, useRef, useState} from 'react';
 import {FileUp} from 'lucide-react';
 
-import type {ImportExtractResult} from '@/lib/import-parse';
+import type {ImportExtractResult} from '@backend/import-parse';
 import {Button} from '@/components/ui/button';
 import {
   Card,

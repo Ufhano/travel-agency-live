@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import type { TripStatus } from "@/lib/types";
+import type { TripStatus } from "@backend/types";
 import { Badge } from "@/components/ui/badge";
 
 const map: Record<
