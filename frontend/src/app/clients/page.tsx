@@ -56,9 +56,13 @@ export default async function ClientsPage() {
               <TableRow>
                 <TableHead>Client</TableHead>
                 <TableHead className="hidden md:table-cell">Trip</TableHead>
-                <TableHead className="text-right">Package</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
+                <TableHead className="text-right leading-snug lg:whitespace-normal max-w-[8rem]">
+                  Total amount to be paid
+                </TableHead>
+                <TableHead className="text-right">Amount paid</TableHead>
+                <TableHead className="text-right leading-snug lg:whitespace-normal max-w-[8rem]">
+                  Outstanding amount
+                </TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>

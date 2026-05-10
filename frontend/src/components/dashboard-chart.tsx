@@ -24,7 +24,7 @@ export function DashboardChart({ rows }: { rows: TripAggregate[] }) {
     <Card className="print:hidden">
       <CardHeader>
         <CardTitle className="text-base">
-          Cash received vs balance due by departure
+          Amount paid vs outstanding amount by departure
         </CardTitle>
       </CardHeader>
       <CardContent className="h-[280px]">
@@ -44,13 +44,13 @@ export function DashboardChart({ rows }: { rows: TripAggregate[] }) {
             />
             <Bar
               dataKey="collected"
-              name="Received"
+              name="Amount paid"
               fill="hsl(var(--primary))"
               radius={[4, 4, 0, 0]}
             />
             <Bar
               dataKey="outstanding"
-              name="Balance due"
+              name="Outstanding amount"
               fill="hsl(var(--muted-foreground) / 0.35)"
               radius={[4, 4, 0, 0]}
             />

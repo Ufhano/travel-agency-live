@@ -3,7 +3,7 @@ import { getSql } from "./db";
 import type { AppData } from "./app-data";
 import type { Client, Payment, Trip, TripStatus } from "./types";
 
-/** Use Neon when `DATABASE_URL` is set; otherwise the bundled demo arrays in `data.ts`. */
+/** Neon when `DATABASE_URL` is set; otherwise typed empty fallback from `data.ts`. */
 export async function loadAppData(): Promise<AppData> {
   const sql = getSql();
   if (!sql) {

@@ -26,7 +26,7 @@ export function AppShell({children}: {children: React.ReactNode}) {
             <span className='hidden sm:inline'>
               Nendila Travel Explorers
               <span className='ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground'>
-                Internal demo
+                Operations console
               </span>
             </span>
           </Link>

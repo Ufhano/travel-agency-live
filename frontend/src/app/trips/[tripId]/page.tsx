@@ -69,24 +69,24 @@ export default async function TripPage({
         <Card className="w-full md:max-w-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Revenue on this departure
+              Payment status (this departure)
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-muted-foreground">Expected</p>
+              <p className="text-muted-foreground">Total amount to be paid</p>
               <p className="font-semibold tabular-nums">
                 {formatZAR(agg.totalExpectedRevenue)}
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground">Collected</p>
+              <p className="text-muted-foreground">Amount paid</p>
               <p className="font-semibold tabular-nums text-emerald-800 dark:text-emerald-300">
                 {formatZAR(agg.totalPaid)}
               </p>
             </div>
             <div className="col-span-2">
-              <p className="text-muted-foreground">Outstanding</p>
+              <p className="text-muted-foreground">Outstanding amount</p>
               <p className="text-lg font-bold tabular-nums">
                 {formatZAR(agg.outstanding)}
               </p>

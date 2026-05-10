@@ -1,13 +1,6 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Banknote,
-  Calendar,
-  PiggyBank,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { ArrowRight, Banknote, Calendar, PiggyBank, Wallet } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard-chart";
 import { KeyOperationalInsights } from "@/components/key-operational-insights";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,11 +16,11 @@ import { TripStatusBadge } from "@/components/trip-status-badge";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
-
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const asOfDay = formatDate(new Date().toISOString().slice(0, 10));
+
   const data = await loadAppData();
   const {
     aggregateTrip,
@@ -45,43 +38,37 @@ export default async function DashboardPage() {
           Trip operations dashboard
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Central trip and payment visibility for better planning, collections, and
-          client servicing. Figures as at{" "}
-          <span className="font-medium text-foreground">19 Apr 2026</span>{" "}
-          (demo snapshot).
+          Central trip and payment visibility for planning, collections, and client servicing.
+          Balances evaluated as at{" "}
+          <span className="font-medium text-foreground">{asOfDay}</span>{" "}
+          from your configured data store.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Departures"
           value={String(summary.totalTrips)}
           icon={Calendar}
-          hint="Trips on the calendar for this demo"
+          hint="Trips on file"
         />
         <MetricCard
-          title="Travellers booked"
-          value={String(summary.totalClients)}
-          icon={Users}
-          hint="Confirmed passengers across all departures"
+          title="Total amount to be paid"
+          value={formatZAR(summary.totalAmountToBePaid)}
+          icon={Wallet}
+          hint="Sum of booked package prices across trips"
         />
         <MetricCard
-          title="Receipts posted"
-          value={formatZAR(summary.totalInvoiced)}
-          icon={TrendingUp}
-          hint="Sum of every payment line (each has its own invoice #)"
-        />
-        <MetricCard
-          title="Cash in"
+          title="Amount paid"
           value={formatZAR(summary.totalCollected)}
           icon={PiggyBank}
-          hint="Applied to packages — matches traveller ledgers"
+          hint="Cash applied to traveller packages"
         />
         <MetricCard
-          title="Outstanding"
+          title="Outstanding amount"
           value={formatZAR(summary.totalOutstanding)}
           icon={Banknote}
-          hint="Still to collect on open bookings"
+          hint="Still to collect"
           emphasize
         />
       </div>
@@ -97,13 +84,24 @@ export default async function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Trip</TableHead>
-                    <TableHead className="hidden md:table-cell">Departs</TableHead>
-                    <TableHead className="text-right">Fill</TableHead>
-                    <TableHead className="hidden sm:table-cell text-right">
-                      Expected
+                    <TableHead className="hidden md:table-cell whitespace-nowrap">
+                      Departs
                     </TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="text-right whitespace-normal min-w-[7.5rem] max-w-[10rem] align-bottom leading-tight">
+                      Total amount
+                      <br />
+                      <span className="font-normal">to be paid</span>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-normal min-w-[6rem] max-w-[9rem] leading-tight">
+                      Amount
+                      <br />
+                      <span className="font-normal">paid</span>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-normal min-w-[6rem] max-w-[9rem] leading-tight">
+                      Outstanding
+                      <br />
+                      <span className="font-normal">amount</span>
+                    </TableHead>
                     <TableHead className="hidden lg:table-cell">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -127,12 +125,6 @@ export default async function DashboardPage() {
                           {formatDate(agg.trip.departureDate)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {agg.confirmedCount}/{agg.trip.capacity}
-                          <div className="mx-auto mt-1 max-w-[88px] md:ml-auto">
-                            <Progress value={agg.fillRatio * 100} />
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-right tabular-nums">
                           {formatZAR(agg.totalExpectedRevenue)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-emerald-800 dark:text-emerald-300">
@@ -173,13 +165,19 @@ export default async function DashboardPage() {
                 <span className="text-foreground">{formatDate(agg.trip.departureDate)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Headcount</span>
-                <span className="font-medium text-foreground">
-                  {agg.confirmedCount} / {agg.trip.capacity}
+                <span>Total amount to be paid</span>
+                <span className="font-medium tabular-nums text-foreground">
+                  {formatZAR(agg.totalExpectedRevenue)}
                 </span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Outstanding</span>
+                <span>Amount paid</span>
+                <span className="font-semibold tabular-nums text-emerald-800 dark:text-emerald-300">
+                  {formatZAR(agg.totalPaid)}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Outstanding amount</span>
                 <span className="font-medium tabular-nums text-foreground">
                   {formatZAR(agg.outstanding)}
                 </span>

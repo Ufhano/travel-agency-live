@@ -12,6 +12,38 @@ const MAX_BYTES = 6 * 1024 * 1024;
 
 type DocFormat = 'spreadsheet' | 'pdf' | 'word';
 
+const DOC_FORMAT_SET: ReadonlySet<string> = new Set(['spreadsheet', 'pdf', 'word']);
+
+function extensionMatchesChosenKind(lower: string, kind: DocFormat): boolean {
+  switch (kind) {
+    case 'spreadsheet':
+      return (
+        lower.endsWith('.csv') ||
+        lower.endsWith('.xlsx') ||
+        lower.endsWith('.xls')
+      );
+    case 'pdf':
+      return lower.endsWith('.pdf');
+    case 'word':
+      return lower.endsWith('.docx');
+    default:
+      return false;
+  }
+}
+
+function kindLabel(kind: DocFormat): string {
+  switch (kind) {
+    case 'spreadsheet':
+      return 'Spreadsheet (.csv / .xlsx / .xls)';
+    case 'pdf':
+      return 'PDF (.pdf)';
+    case 'word':
+      return 'Word (.docx)';
+    default:
+      return kind;
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const ct = request.headers.get('content-type') ?? '';
@@ -23,6 +55,18 @@ export async function POST(request: Request): Promise<Response> {
     if (!file || typeof file !== 'object' || !('arrayBuffer' in file))
       return NextResponse.json({error: 'Missing file field "file".'}, {status: 400});
 
+    const kindRaw = form.get('importKind');
+    const kind =
+      typeof kindRaw === 'string' && DOC_FORMAT_SET.has(kindRaw) ? (kindRaw as DocFormat) : null;
+    if (!kind)
+      return NextResponse.json(
+        {
+          error:
+            'Select what you are uploading (spreadsheet, PDF, or Word) before choosing a file.',
+        },
+        {status: 400},
+      );
+
     const typed = file as File;
     if (typed.size > MAX_BYTES)
       return NextResponse.json({error: 'File too large (max 6 MB).'}, {status: 413});
@@ -32,10 +76,27 @@ export async function POST(request: Request): Promise<Response> {
 
     const buf = Buffer.from(await typed.arrayBuffer());
 
-    let rows: ImportExtractResult[];
-    let format: DocFormat;
+    if (lower.endsWith('.doc'))
+      return NextResponse.json(
+        {
+          error:
+            'Older Word .doc files are not supported. Save As .docx (or export to PDF) and upload again.',
+        },
+        {status: 415},
+      );
 
-    if (lower.endsWith('.pdf')) {
+    if (!extensionMatchesChosenKind(lower, kind))
+      return NextResponse.json(
+        {
+          error: `Expected ${kindLabel(kind)} for your selection — this file (${name}) does not match.`,
+        },
+        {status: 400},
+      );
+
+    let rows: ImportExtractResult[];
+    const format = kind;
+
+    if (kind === 'pdf') {
       ensurePdfJsWorker();
       const parser = new PDFParse({data: new Uint8Array(buf)});
       try {
@@ -44,34 +105,11 @@ export async function POST(request: Request): Promise<Response> {
       } finally {
         await parser.destroy();
       }
-      format = 'pdf';
-    } else if (lower.endsWith('.docx')) {
+    } else if (kind === 'word') {
       const {value} = await mammoth.extractRawText({buffer: buf});
       rows = [parseUnstructuredImportText(value ?? '')];
-      format = 'word';
-    } else if (lower.endsWith('.doc')) {
-      return NextResponse.json(
-        {
-          error:
-            'Older Word .doc files are not supported. Save As .docx (or export to PDF) and upload again.',
-        },
-        {status: 415},
-      );
-    } else if (
-      lower.endsWith('.xlsx') ||
-      lower.endsWith('.xls') ||
-      lower.endsWith('.csv')
-    ) {
-      rows = parseSpreadsheetImport(buf);
-      format = 'spreadsheet';
     } else {
-      return NextResponse.json(
-        {
-          error:
-            'Unsupported type. Upload .csv, .xlsx, .xls, .docx, or .pdf (legacy .doc → save as .docx).',
-        },
-        {status: 415},
-      );
+      rows = parseSpreadsheetImport(buf);
     }
 
     const unstructuredWarning =

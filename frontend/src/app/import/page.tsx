@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/card';
 import {formatDate, formatZAR} from '@/lib/utils';
 
+type ImportKind = 'spreadsheet' | 'pdf' | 'word';
+
 type ApiOk = {
   format: 'spreadsheet' | 'pdf' | 'word';
   fileName: string;
@@ -22,56 +24,140 @@ type ApiOk = {
   warnings: string[];
 };
 
+const ACCEPT_BY_KIND: Record<ImportKind, string> = {
+  spreadsheet:
+    '.csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: '.pdf,application/pdf',
+  word: '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+const IMPORT_OPTIONS: readonly {
+  value: ImportKind;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: 'spreadsheet',
+    title: 'Spreadsheet',
+    description: 'CSV or Excel (.csv, .xlsx, .xls) with header row',
+  },
+  {
+    value: 'pdf',
+    title: 'PDF',
+    description: 'Payment or receipt PDF (text-based extract)',
+  },
+  {
+    value: 'word',
+    title: 'Word document',
+    description: '.docx export — legacy .doc is not supported',
+  },
+];
+
 export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [importKind, setImportKind] = useState<ImportKind | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<ApiOk | null>(null);
 
-  const submit = useCallback(async (files: FileList | null) => {
-    const f = files?.[0];
-    if (!f) return;
+  const submit = useCallback(
+    async (files: FileList | null, kind: ImportKind) => {
+      const f = files?.[0];
+      if (!f) return;
+      setError(null);
+      setPayload(null);
+      setLoading(true);
+      try {
+        const body = new FormData();
+        body.set('file', f);
+        body.set('importKind', kind);
+        const res = await fetch('/api/import-document', {method: 'POST', body});
+        const json = (await res.json()) as ApiOk | {error: string};
+        if (!res.ok) setError((json as {error: string}).error ?? 'Upload failed.');
+        else setPayload(json as ApiOk);
+      } catch {
+        setError('Could not reach the server.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const onPickKind = (next: ImportKind) => {
+    setImportKind(next);
     setError(null);
     setPayload(null);
-    setLoading(true);
-    try {
-      const body = new FormData();
-      body.set('file', f);
-      const res = await fetch('/api/import-document', {method: 'POST', body});
-      const json = (await res.json()) as ApiOk | {error: string};
-      if (!res.ok) setError((json as {error: string}).error ?? 'Upload failed.');
-      else setPayload(json as ApiOk);
-    } catch {
-      setError('Could not reach the server.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    if (fileRef.current) fileRef.current.value = '';
+  };
 
   return (
     <div className='space-y-8'>
       <header className='space-y-2'>
         <h1 className='text-2xl font-semibold tracking-tight'>Import from document</h1>
         <p className='max-w-2xl text-sm text-muted-foreground'>
-          Upload a spreadsheet (CSV or Excel), a Word (.docx) booking or receipt export, or a
-          payment PDF. The demo extracts traveller details and payments for review — nothing is
-          saved (internal preview only).
+          First choose what you are importing, then pick a matching file. The extractors pull traveller
+          details and payments for review — nothing is saved (internal preview only).
         </p>
       </header>
+
+      <Card className='max-w-3xl'>
+        <CardHeader>
+          <CardTitle className='text-lg'>Step 1 — File type</CardTitle>
+          <CardDescription>
+            This tells the parser which rules to apply. Extensions must match your choice (max 6 MB).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            className='grid gap-3 sm:grid-cols-3'
+            role='radiogroup'
+            aria-label='Import file category'
+          >
+            {IMPORT_OPTIONS.map((opt) => {
+              const selected = importKind === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type='button'
+                  role='radio'
+                  aria-checked={selected}
+                  aria-label={opt.title}
+                  disabled={loading}
+                  onClick={() => onPickKind(opt.value)}
+                  className={
+                    selected
+                      ? 'rounded-lg border-2 border-primary bg-primary/5 p-4 text-left shadow-sm outline-none ring-2 ring-primary/20 transition-colors'
+                      : 'rounded-lg border border-border bg-card p-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                  }
+                >
+                  <p className='font-semibold text-foreground'>{opt.title}</p>
+                  <p className='mt-1 text-xs text-muted-foreground'>{opt.description}</p>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className='max-w-xl'>
         <CardHeader>
           <CardTitle className='flex items-center gap-2 text-lg'>
             <FileUp className='h-5 w-5' aria-hidden />
-            Upload file
+            Step 2 — Upload file
           </CardTitle>
           <CardDescription>
-            Supported: <strong className='font-medium text-foreground'>.csv</strong>,{' '}
-            <strong className='font-medium text-foreground'>.xlsx</strong>,{' '}
-            <strong className='font-medium text-foreground'>.xls</strong>,{' '}
-            <strong className='font-medium text-foreground'>.docx</strong>,{' '}
-            <strong className='font-medium text-foreground'>.pdf</strong> (max 6 MB). Older
-            .doc → save as .docx first.
+            {importKind ? (
+              <>
+                Accepts files for:{' '}
+                <strong className='font-medium text-foreground'>
+                  {IMPORT_OPTIONS.find((o) => o.value === importKind)?.title}
+                </strong>
+                .
+              </>
+            ) : (
+              'Select a file type above before choosing a file.'
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className='space-y-4'>
@@ -80,17 +166,30 @@ export default function ImportPage() {
               ref={fileRef}
               id='import-document-file'
               type='file'
-              accept='.csv,.xlsx,.xls,.doc,.docx,.pdf,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword'
+              accept={importKind ? ACCEPT_BY_KIND[importKind] : undefined}
               className='hidden'
-              disabled={loading}
-              aria-label='Choose spreadsheet, Word, or PDF file to import'
-              onChange={(e) => void submit(e.target.files)}
+              disabled={loading || !importKind}
+              aria-label={
+                importKind
+                  ? `Choose ${IMPORT_OPTIONS.find((o) => o.value === importKind)?.title} file to import`
+                  : 'Choose file (select file type first)'
+              }
+              onChange={(e) => {
+                if (!importKind) return;
+                void submit(e.target.files, importKind);
+              }}
             />
             <Button
               type='button'
               variant='default'
-              disabled={loading}
-              aria-label={loading ? 'Reading file' : 'Open file picker to upload export'}
+              disabled={loading || !importKind}
+              aria-label={
+                loading
+                  ? 'Reading file'
+                  : importKind
+                    ? 'Open file picker to upload export'
+                    : 'Select file type first'
+              }
               onClick={() => fileRef.current?.click()}
             >
               {loading ? 'Reading file…' : 'Choose file'}
@@ -98,10 +197,12 @@ export default function ImportPage() {
             <Button
               type='button'
               variant='outline'
-              disabled={loading || !payload}
+              disabled={loading}
               onClick={() => {
                 setPayload(null);
                 setError(null);
+                setImportKind(null);
+                if (fileRef.current) fileRef.current.value = '';
               }}
             >
               Clear
@@ -247,7 +348,7 @@ function ExtractedCard({row}: {row: ImportExtractResult}) {
           <div className='grid gap-3 sm:grid-cols-2'>
             <Field label='Invoice #' val={row.payment.invoiceNumber} />
             <Field
-              label='Amount'
+              label='Amount paid'
               val={row.payment.amount != null ? formatZAR(row.payment.amount) : null}
             />
             <Field

@@ -9,7 +9,8 @@ export async function GET() {
       {
         ok: false,
         mode: "static",
-        message: "DATABASE_URL not set — app uses bundled demo data.",
+        message:
+          "DATABASE_URL not set — using empty local catalogue until configured.",
       },
       { status: 200 },
     );

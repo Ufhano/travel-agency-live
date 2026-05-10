@@ -10,8 +10,6 @@ import type {
   TripAggregate,
 } from "./types";
 
-const DEMO_TODAY = "2026-04-19";
-
 export type TripCompute = {
   getPaymentById(paymentId: string): Payment | undefined;
   getTrip(tripId: string): Trip | undefined;
@@ -32,6 +30,8 @@ export type TripCompute = {
     totalTrips: number;
     totalClients: number;
     totalInvoiced: number;
+    /** Sum of booked package totals across trips (excluding empty departures). */
+    totalAmountToBePaid: number;
     totalCollected: number;
     totalOutstanding: number;
     tripAggregates: TripAggregate[];
@@ -43,6 +43,7 @@ export type TripCompute = {
 
 export function createCompute(data: AppData): TripCompute {
   const { trips, clients, payments } = data;
+  const asOfDate = new Date().toISOString().slice(0, 10);
 
   function getPaymentById(paymentId: string): Payment | undefined {
     return payments.find((p) => p.id === paymentId);
@@ -81,7 +82,7 @@ export function createCompute(data: AppData): TripCompute {
     const paid = totalPaidForClient(client.id);
     const bal = balanceForClient(client);
     if (bal <= 0) return "Paid in Full";
-    if (client.balanceDueDate < DEMO_TODAY && bal > 0) return "Overdue";
+    if (client.balanceDueDate < asOfDate && bal > 0) return "Overdue";
     if (paid <= 0) return "Partial Payment";
     if (paid < client.packagePrice * 0.35) return "Deposit Paid";
     return "Partial Payment";
@@ -199,12 +200,17 @@ export function createCompute(data: AppData): TripCompute {
     const totalTrips = trips.length;
     const totalClients = clients.length;
     const totalInvoiced = payments.reduce((s, p) => s + p.amount, 0);
+    const totalAmountToBePaid = tripList.reduce(
+      (s, t) => s + t.totalExpectedRevenue,
+      0,
+    );
     const totalCollected = tripList.reduce((s, t) => s + t.totalPaid, 0);
     const totalOutstanding = tripList.reduce((s, t) => s + t.outstanding, 0);
     return {
       totalTrips,
       totalClients,
       totalInvoiced,
+      totalAmountToBePaid,
       totalCollected,
       totalOutstanding,
       tripAggregates: tripList,
@@ -215,7 +221,7 @@ export function createCompute(data: AppData): TripCompute {
     const out: DashboardInsight[] = [];
     for (const t of trips) {
       const agg = aggregateTrip(t.id)!;
-      if (agg.fillRatio < 0.4 && agg.trip.departureDate > DEMO_TODAY) {
+      if (agg.fillRatio < 0.4 && agg.trip.departureDate > asOfDate) {
         out.push({
           tripId: t.id,
           type: "under-filled",
@@ -232,7 +238,7 @@ export function createCompute(data: AppData): TripCompute {
       const overdueClients = agg.clients.filter(
         (c) =>
           balanceForClient(c) > 0 &&
-          c.balanceDueDate < DEMO_TODAY,
+          c.balanceDueDate < asOfDate,
       );
       if (overdueClients.length > 0) {
         out.push({
@@ -260,7 +266,7 @@ export function createCompute(data: AppData): TripCompute {
       const overdueClients = agg.clients.filter(
         (c) =>
           balanceForClient(c) > 0 &&
-          c.balanceDueDate < DEMO_TODAY,
+          c.balanceDueDate < asOfDate,
       );
       if (overdueClients.length > 0) {
         overdueRows.push({
@@ -282,7 +288,7 @@ export function createCompute(data: AppData): TripCompute {
         });
       }
 
-      if (agg.fillRatio < 0.4 && agg.trip.departureDate > DEMO_TODAY) {
+      if (agg.fillRatio < 0.4 && agg.trip.departureDate > asOfDate) {
         underRows.push({
           id: `under-${t.id}`,
           tripId: t.id,
@@ -299,7 +305,7 @@ export function createCompute(data: AppData): TripCompute {
 
   function displayTripStatus(trip: Trip, agg: TripAggregate): string {
     if (trip.status === "Closed") return "Closed";
-    if (agg.fillRatio < 0.35 && trip.departureDate > DEMO_TODAY) {
+    if (agg.fillRatio < 0.35 && trip.departureDate > asOfDate) {
       return "Under-filled";
     }
     if (agg.fillRatio >= 0.85 && trip.status !== "Draft") {

@@ -1,5 +1,5 @@
--- Run this in the Neon SQL editor (or psql) after creating a project branch.
--- Then: npm run db:seed — with DATABASE_URL set (see .env.example).
+-- Run in the Neon SQL editor (or psql) once per branch.
+-- To clear all rows: npm run db:wipe (requires DATABASE_URL; see frontend/.env.example).
 
 CREATE TABLE IF NOT EXISTS trips (
   id TEXT PRIMARY KEY,

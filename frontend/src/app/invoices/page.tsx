@@ -46,7 +46,7 @@ export default async function InvoicesPage() {
                 <TableHead className="hidden sm:table-cell">Date</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead className="hidden lg:table-cell">Trip</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Amount paid</TableHead>
                 <TableHead className="hidden md:table-cell text-right">
                   Paid after
                 </TableHead>

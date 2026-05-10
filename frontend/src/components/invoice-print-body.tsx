@@ -119,7 +119,7 @@ export function InvoicePrintBody({ ctx }: { ctx: PaymentWithContext }) {
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
         Nendila Travel Explorers — payment receipt. Each transaction keeps its own
-        invoice number for audit and client records. Non-production demo data.
+        invoice number for audit and client records.
       </p>
     </div>
   );

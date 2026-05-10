@@ -4,7 +4,7 @@ type NeonSql = ReturnType<typeof neon>;
 
 let sql: NeonSql | undefined;
 
-/** Returns Neon `sql` for `DATABASE_URL`, or `undefined` when not configured (demo falls back to in-memory seed). */
+/** Neon `sql` when `DATABASE_URL` is set; otherwise `undefined` (empty local fallback via `data.ts`). */
 export function getSql(): NeonSql | undefined {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) return undefined;

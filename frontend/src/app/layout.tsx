@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Nendila Travel Explorers — Operations demo',
+  title: 'Nendila Travel Explorers — Operations',
   description:
     'Internal operations preview: live departures, payment tracking, balances, and one immutable invoice per payment.',
 };
