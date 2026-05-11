@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx';
 
+import { isXlsxBuffer, runPythonExcelExtract } from './ingestion/parse-excel-python';
+
 /** One logical record from a row or PDF heuristic pass. */
 export type ImportExtractResult = {
   client: {
@@ -18,6 +20,8 @@ export type ImportExtractResult = {
     note: string | null;
   };
   sourceRow?: number;
+  /** Excel worksheet tab name when present — often encodes destination / product line. */
+  sourceSheet?: string | null;
   confidence: 'high' | 'medium' | 'low';
 };
 
@@ -90,6 +94,9 @@ const HEADER_ALIASES: Record<string, keyof NormalizedCols> = {
   balanceduedate: 'balanceDueDate',
   deadline: 'balanceDueDate',
   outstanding: '_outstandingAmount',
+  'outstanding amount': '_outstandingAmount',
+  'total amount to be paid': 'packagePrice',
+  'total to be paid': 'packagePrice',
 
   invoiceno: 'invoiceNumber',
   'invoice number': 'invoiceNumber',
@@ -771,41 +778,70 @@ function matrixToObjects(
   return out;
 }
 
-function parseRowsFromSheet(sheet: XLSX.WorkSheet): ImportExtractResult[] {
-  const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-    defval: '',
-    raw: false,
+/** Header-keyed rows (e.g. from Python per-sheet extract) → traveller/payment cards. */
+export function recordsToImportExtractResults(
+  rows: Record<string, unknown>[],
+): ImportExtractResult[] {
+  const results: ImportExtractResult[] = [];
+  rows.forEach((row, i) => {
+    const n = rowToNormalized(row);
+    const any =
+      Object.keys(n).length > 0 &&
+      [
+        'fullName',
+        'email',
+        'phone',
+        'tripHint',
+        'amount',
+        'invoiceNumber',
+        'packagePrice',
+        'paidAt',
+        'method',
+        'note',
+        'balanceDueDate',
+      ].some((k) => {
+        const v = n[k as keyof NormalizedCols];
+        return v != null && v !== '';
+      });
+    if (!any) return;
+    const raw = row as Record<string, unknown>;
+    const sr = raw._sourceRow;
+    const sourceRow =
+      typeof sr === 'number' && Number.isFinite(sr)
+        ? Math.trunc(sr)
+        : typeof sr === 'string' && /^\d+$/.test(sr)
+          ? parseInt(sr, 10)
+          : i + 2;
+    const base = spreadsheetRowToResult(n, sourceRow);
+    const sh = raw._sheet;
+    const sourceSheet =
+      typeof sh === 'string' && sh.trim().length > 0 ? sh.trim() : null;
+    results.push({ ...base, sourceSheet });
   });
+  return results;
+}
 
-  const tryRows = (rows: Record<string, unknown>[]) => {
-    const results: ImportExtractResult[] = [];
-    rows.forEach((row, i) => {
-      const n = rowToNormalized(row);
-      const any =
-        Object.keys(n).length > 0 &&
-        [
-          'fullName',
-          'email',
-          'phone',
-          'tripHint',
-          'amount',
-          'invoiceNumber',
-          'packagePrice',
-          'paidAt',
-          'method',
-          'note',
-          'balanceDueDate',
-        ].some((k) => {
-          const v = n[k as keyof NormalizedCols];
-          return v != null && v !== '';
-        });
-      if (!any) return;
-      results.push(spreadsheetRowToResult(n, i + 2));
-    });
-    return results;
-  };
+function tagRowsWithSheet<T extends Record<string, unknown>>(
+  rows: T[],
+  sheetName?: string,
+): Record<string, unknown>[] {
+  if (!sheetName) return rows as Record<string, unknown>[];
+  return rows.map((r) => ({ ...r, _sheet: sheetName }));
+}
 
-  let results = tryRows(jsonRows);
+function parseRowsFromSheet(
+  sheet: XLSX.WorkSheet,
+  sheetName?: string,
+): ImportExtractResult[] {
+  const jsonRows = tagRowsWithSheet(
+    XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: '',
+      raw: false,
+    }),
+    sheetName,
+  );
+
+  let results = recordsToImportExtractResults(jsonRows);
   if (results.length > 0) return results;
 
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
@@ -816,8 +852,8 @@ function parseRowsFromSheet(sheet: XLSX.WorkSheet): ImportExtractResult[] {
 
   for (const skip of [0, 1] as const) {
     if (matrix.length <= skip + 2) continue;
-    const objs = matrixToObjects(matrix, skip);
-    results = tryRows(objs);
+    const objs = tagRowsWithSheet(matrixToObjects(matrix, skip), sheetName);
+    results = recordsToImportExtractResults(objs);
     if (results.length > 0) return results;
   }
 
@@ -828,8 +864,8 @@ function parseRowsFromSheet(sheet: XLSX.WorkSheet): ImportExtractResult[] {
   }) as unknown[][];
   for (const skip of [0, 1] as const) {
     if (matrixRaw.length <= skip + 2) continue;
-    const objs = matrixToObjects(matrixRaw, skip);
-    results = tryRows(objs);
+    const objs = tagRowsWithSheet(matrixToObjects(matrixRaw, skip), sheetName);
+    results = recordsToImportExtractResults(objs);
     if (results.length > 0) return results;
   }
 
@@ -838,15 +874,39 @@ function parseRowsFromSheet(sheet: XLSX.WorkSheet): ImportExtractResult[] {
 
 export function parseSpreadsheetImport(buffer: Buffer): ImportExtractResult[] {
   const clean = stripBomBuffer(buffer);
-  const wb = XLSX.read(clean, {type: 'buffer', raw: false});
-  const name = wb.SheetNames[0];
-  if (!name) return [];
-  const sheet = wb.Sheets[name];
+  let wb: XLSX.WorkBook;
+  try {
+    wb = XLSX.read(clean, { type: 'buffer', raw: false });
+  } catch {
+    return [];
+  }
+  const out: ImportExtractResult[] = [];
+  for (const name of wb.SheetNames) {
+    const sheet = wb.Sheets[name];
+    if (!sheet) continue;
+    const ledger = tryParsePaymentLedger(sheet);
+    if (ledger.length > 0) {
+      out.push(...ledger);
+      continue;
+    }
+    out.push(...parseRowsFromSheet(sheet, name));
+  }
+  return out;
+}
 
-  const ledger = tryParsePaymentLedger(sheet);
-  if (ledger.length > 0) return ledger;
-
-  return parseRowsFromSheet(sheet);
+/** Prefer Python + openpyxl for .xlsx (all sheets, header sniff); else Node path. */
+export async function parseSpreadsheetImportAsync(
+  buffer: Buffer,
+): Promise<ImportExtractResult[]> {
+  const clean = stripBomBuffer(buffer);
+  if (isXlsxBuffer(clean)) {
+    const py = await runPythonExcelExtract(clean);
+    if (py.ok && py.rows.length > 0) {
+      const fromPy = recordsToImportExtractResults(py.rows);
+      if (fromPy.length > 0) return fromPy;
+    }
+  }
+  return parseSpreadsheetImport(clean);
 }
 
 /* --- Unstructured (Word / PDF): keyword scan over full text --- */

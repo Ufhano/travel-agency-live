@@ -4,7 +4,10 @@ import {PDFParse} from 'pdf-parse';
 
 import type {ImportExtractResult} from '@backend/import-parse';
 import {ensurePdfJsWorker} from '@backend/pdf-worker';
-import {parseSpreadsheetImport, parseUnstructuredImportText} from '@backend/import-parse';
+import {
+  parseSpreadsheetImportAsync,
+  parseUnstructuredImportText,
+} from '@backend/import-parse';
 
 export const runtime = 'nodejs';
 
@@ -109,7 +112,7 @@ export async function POST(request: Request): Promise<Response> {
       const {value} = await mammoth.extractRawText({buffer: buf});
       rows = [parseUnstructuredImportText(value ?? '')];
     } else {
-      rows = parseSpreadsheetImport(buf);
+      rows = await parseSpreadsheetImportAsync(buf);
     }
 
     const unstructuredWarning =

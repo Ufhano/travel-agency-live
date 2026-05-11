@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 
-/** Per-sheet row objects with string keys from headers; all sheets merged */
-export function parseExcel(buffer: Buffer, logs: string[]): Record<string, unknown>[] {
+import { isXlsxBuffer, runPythonExcelExtract } from "./parse-excel-python";
+
+function parseExcelSheetJS(buffer: Buffer, logs: string[]): Record<string, unknown>[] {
   let workbook: XLSX.WorkBook;
   try {
     workbook = XLSX.read(buffer, { type: "buffer", cellDates: true, dense: false });
@@ -24,7 +25,9 @@ export function parseExcel(buffer: Buffer, logs: string[]): Record<string, unkno
         raw: false,
       });
     } catch (e) {
-      logs.push(`Sheet "${sheetName}" JSON export failed: ${e instanceof Error ? e.message : String(e)}`);
+      logs.push(
+        `Sheet "${sheetName}" JSON export failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
       continue;
     }
 
@@ -35,7 +38,7 @@ export function parseExcel(buffer: Buffer, logs: string[]): Record<string, unkno
     }
   }
 
-  logs.push(`Excel read ${sheetCount} sheet(s) → ${merged.length} populated row(s).`);
+  logs.push(`Excel (SheetJS) read ${sheetCount} sheet(s) → ${merged.length} populated row(s).`);
 
   return merged;
 }
@@ -43,4 +46,29 @@ export function parseExcel(buffer: Buffer, logs: string[]): Record<string, unkno
 function isEmptyRowObject(row: Record<string, unknown>): boolean {
   const vals = Object.values(row).filter((k) => k !== "_sheet");
   return vals.every((v) => v == null || String(v).trim() === "");
+}
+
+/**
+ * For `.xlsx`, tries Python/openpyxl (per-sheet header detection) first; falls back to SheetJS.
+ * `.xls` uses SheetJS only.
+ */
+export async function parseExcel(
+  buffer: Buffer,
+  logs: string[],
+): Promise<Record<string, unknown>[]> {
+  if (isXlsxBuffer(buffer)) {
+    const py = await runPythonExcelExtract(buffer);
+    if (py.logs?.length) logs.push(...py.logs);
+    if (py.ok && py.rows.length > 0) {
+      logs.push("Excel: used Python (openpyxl) multi-sheet extract.");
+      return py.rows;
+    }
+    logs.push(
+      py.ok
+        ? "Excel: Python returned no data rows — SheetJS fallback."
+        : `Excel: Python unavailable (${py.error ?? "unknown"}) — SheetJS fallback.`,
+    );
+  }
+
+  return parseExcelSheetJS(buffer, logs);
 }

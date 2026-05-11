@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
+import { AddClientDialog } from "@/components/add-client-dialog";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatZAR } from "@/lib/utils";
@@ -31,16 +32,26 @@ export default async function ClientsPage() {
     status: clientPaymentStatus(c),
   }));
 
+  const tripOptions = data.trips.map((t) => ({
+    id: t.id,
+    name: t.name,
+    destination: t.destination,
+    departureDate: t.departureDate,
+  }));
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Traveller directory
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Each booking ties to a departure, live balance, and full payment /
-          invoice trail.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Traveller directory
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Each booking ties to a departure, live balance, and full payment /
+            invoice trail.
+          </p>
+        </div>
+        <AddClientDialog trips={tripOptions} />
       </div>
 
       <Card>

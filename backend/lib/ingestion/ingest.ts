@@ -55,7 +55,7 @@ export async function ingestFile(opts: {
     }
 
     if (kind === "excel") {
-      rawRows = parseExcel(opts.buffer, logs);
+      rawRows = await parseExcel(opts.buffer, logs);
       rawExtractedText = safeJsonPreview(rawRows);
     } else if (kind === "csv") {
       rawRows = parseCsv(opts.buffer, logs);
