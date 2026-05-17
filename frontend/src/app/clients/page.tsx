@@ -25,13 +25,19 @@ export default async function ClientsPage() {
     getTrip,
     totalPaidForClient,
   } = createCompute(data);
-  const rows = data.clients.map((c) => ({
-    client: c,
-    trip: getTrip(c.tripId)!,
-    paid: totalPaidForClient(c.id),
-    balance: balanceForClient(c),
-    status: clientPaymentStatus(c),
-  }));
+  const rows = data.clients.flatMap((c) => {
+    const trip = getTrip(c.tripId);
+    if (!trip) return [];
+    return [
+      {
+        client: c,
+        trip,
+        paid: totalPaidForClient(c.id),
+        balance: balanceForClient(c),
+        status: clientPaymentStatus(c),
+      },
+    ];
+  });
 
   const tripOptions = data.trips.map((t) => ({
     id: t.id,

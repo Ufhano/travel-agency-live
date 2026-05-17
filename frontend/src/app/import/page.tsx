@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {CreateTripInline} from '@/components/create-trip-inline';
 import {formatDate, formatZAR} from '@/lib/utils';
 
 type ImportKind = 'spreadsheet' | 'pdf' | 'word';
@@ -108,33 +109,32 @@ export default function ImportPage() {
   const [savingKeys, setSavingKeys] = useState<Set<string>>(() => new Set());
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setTripsLoading(true);
-      try {
-        const res = await fetch('/api/trips');
-        const json = (await res.json()) as {
-          trips: TripOption[];
-          mode?: string;
-          message?: string;
-        };
-        if (cancelled) return;
-        setTrips(Array.isArray(json.trips) ? json.trips : []);
-        setTripsHint(json.mode === 'static' ? (json.message ?? null) : null);
-      } catch {
-        if (!cancelled) {
-          setTrips([]);
-          setTripsHint('Could not load trips.');
-        }
-      } finally {
-        if (!cancelled) setTripsLoading(false);
+  const loadTrips = useCallback(async () => {
+    setTripsLoading(true);
+    try {
+      const res = await fetch('/api/trips');
+      const json = (await res.json()) as {
+        trips: TripOption[];
+        mode?: string;
+        message?: string;
+      };
+      const list = Array.isArray(json.trips) ? json.trips : [];
+      setTrips(list);
+      setTripsHint(json.mode === 'static' ? (json.message ?? null) : null);
+      if (list.length === 1) {
+        setSelectedTripId((prev) => prev || list[0]!.id);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      setTrips([]);
+      setTripsHint('Could not load trips.');
+    } finally {
+      setTripsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadTrips();
+  }, [loadTrips]);
 
   const markSaving = useCallback((keys: string[], on: boolean) => {
     setSavingKeys((prev) => {
@@ -180,6 +180,14 @@ export default function ImportPage() {
           setSaveBanner(data.error ?? `Save failed (${res.status}).`);
           return;
         }
+        if (data.savedCount === 0) {
+          const err =
+            data.failedCount > 0
+              ? data.failed.map((f) => f.error).join('; ')
+              : 'No rows were saved.';
+          setSaveBanner(`Save failed: ${err}`);
+          return;
+        }
         const failedIdx = new Set(data.failed.map((f) => f.index));
         const paymentNotes: string[] = [];
         let si = 0;
@@ -191,7 +199,7 @@ export default function ImportPage() {
             const label = rows[i]?.client.fullName?.trim() || `Row ${i + 1}`;
             paymentNotes.push(`${label}: ${entry.paymentError}`);
           }
-          newlySaved.push(rowKeys[i]);
+          newlySaved.push(rowKeys[i]!);
         }
         setSavedKeys((prev) => {
           const next = new Set(prev);
@@ -199,7 +207,7 @@ export default function ImportPage() {
           return next;
         });
         const parts: string[] = [];
-        parts.push(`Saved ${data.savedCount} traveller(s).`);
+        parts.push(`Saved ${data.savedCount} traveller(s) to Neon. View them on the Clients page.`);
         if (data.failedCount > 0) {
           parts.push(
             `${data.failedCount} failed: ${data.failed.map((f) => f.error).join('; ')}`,
@@ -232,6 +240,11 @@ export default function ImportPage() {
       .sort(([a], [b]) => a.localeCompare(b, undefined, {sensitivity: 'base'}))
       .map(([group, rows]) => ({group, rows}));
   }, [payload]);
+
+  const canSaveToDb = Boolean(selectedTripId.trim()) && trips.length > 0;
+  const firstGroupHint = groupedByDestination[0]?.group;
+  const createTripDefaultName =
+    firstGroupHint && firstGroupHint !== 'Uncategorized' ? firstGroupHint : '';
 
   const submit = useCallback(
     async (files: FileList | null, kind: ImportKind) => {
@@ -425,12 +438,22 @@ export default function ImportPage() {
                 Save to database
               </CardTitle>
               <CardDescription>
-                Choose the trip these travellers belong to, then use the buttons on each card or group.
-                Requires <span className='font-mono text-foreground'>DATABASE_URL</span> and at least one
-                trip in Neon.
+                Pick or create a departure, then save travellers. Each client is stored in Neon under
+                that trip.
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-3'>
+              {trips.length === 0 && !tripsLoading ? (
+                <CreateTripInline
+                  defaultName={createTripDefaultName}
+                  defaultDestination={createTripDefaultName}
+                  onCreated={(trip) => {
+                    setTrips([trip]);
+                    setSelectedTripId(trip.id);
+                    setSaveBanner(`Created “${trip.name}”. You can save travellers now.`);
+                  }}
+                />
+              ) : null}
               <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center'>
                 <label htmlFor='import-trip-select' className='text-sm font-medium'>
                   Trip
@@ -459,6 +482,7 @@ export default function ImportPage() {
                   variant='secondary'
                   size='sm'
                   disabled={
+                    !canSaveToDb ||
                     tripsLoading ||
                     groupedByDestination.every(({rows, group}) =>
                       rows.every((row, idx) =>
@@ -490,8 +514,20 @@ export default function ImportPage() {
                 </Button>
               </div>
               {tripsHint ? <p className='text-xs text-amber-800 dark:text-amber-200'>{tripsHint}</p> : null}
+              {!canSaveToDb && trips.length > 0 && !tripsLoading ? (
+                <p className='text-sm text-amber-800 dark:text-amber-200' role='status'>
+                  Select a trip above before saving travellers.
+                </p>
+              ) : null}
               {saveBanner ? (
-                <p className='text-sm text-muted-foreground' role='status'>
+                <p
+                  className={
+                    saveBanner.startsWith('Save failed')
+                      ? 'text-sm text-destructive'
+                      : 'text-sm text-muted-foreground'
+                  }
+                  role='status'
+                >
                   {saveBanner}
                 </p>
               ) : null}
@@ -551,7 +587,9 @@ export default function ImportPage() {
                       size='sm'
                       variant='outline'
                       className='ml-auto'
-                      disabled={allInGroupSaved || groupSaving || pendingRows.length === 0}
+                      disabled={
+                        !canSaveToDb || allInGroupSaved || groupSaving || pendingRows.length === 0
+                      }
                       onClick={() => {
                         void saveRowsToTrip(selectedTripId, pendingRows, pendingKeys);
                       }}
@@ -576,6 +614,7 @@ export default function ImportPage() {
                           rowKey={rowKey}
                           isSaved={savedKeys.has(rowKey)}
                           isSaving={savingKeys.has(rowKey)}
+                          canSave={canSaveToDb}
                           onSave={() => {
                             void saveRowsToTrip(selectedTripId, [row], [rowKey]);
                           }}
@@ -644,12 +683,14 @@ function ExtractedCard({
   rowKey,
   isSaved,
   isSaving,
+  canSave,
   onSave,
 }: {
   row: ImportExtractResult;
   rowKey: string;
   isSaved: boolean;
   isSaving: boolean;
+  canSave: boolean;
   onSave: () => void;
 }) {
   return (
@@ -673,7 +714,8 @@ function ExtractedCard({
               type='button'
               size='sm'
               variant='default'
-              disabled={isSaving}
+              disabled={isSaving || !canSave}
+              title={!canSave ? 'Select or create a trip first' : undefined}
               onClick={onSave}
             >
               {isSaving ? (

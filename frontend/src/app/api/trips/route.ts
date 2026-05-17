@@ -1,8 +1,46 @@
 import { NextResponse } from "next/server";
 
 import { getSql } from "@backend/db";
+import { createTripInNeon, parseCreateTripInput } from "@backend/trip-save";
 
 export const runtime = "nodejs";
+
+/** Create a departure (required before saving imported travellers). */
+export async function POST(request: Request): Promise<Response> {
+  const sql = getSql();
+  if (!sql) {
+    return NextResponse.json(
+      { error: "Database not configured. Set DATABASE_URL." },
+      { status: 503 },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const parsed = parseCreateTripInput(
+    body && typeof body === "object" ? (body as Parameters<typeof parseCreateTripInput>[0]) : {},
+  );
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
+  try {
+    const trip = await createTripInNeon(sql, parsed.trip);
+    return NextResponse.json({ ok: true, trip }, { status: 201 });
+  } catch (e) {
+    console.error("[api/trips POST]", e);
+    const message = e instanceof Error ? e.message : "Unknown database error.";
+    return NextResponse.json(
+      { error: `Failed to create trip: ${message}` },
+      { status: 500 },
+    );
+  }
+}
 
 /** Minimal trip list for assignment dropdowns (e.g. import save). */
 export async function GET() {
