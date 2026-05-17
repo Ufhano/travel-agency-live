@@ -247,7 +247,18 @@ export default function ImportPage() {
         body.set('file', f);
         body.set('importKind', kind);
         const res = await fetch('/api/import-document', {method: 'POST', body});
-        const json = (await res.json()) as ApiOk | {error: string};
+        const text = await res.text();
+        let json: ApiOk | {error: string};
+        try {
+          json = JSON.parse(text) as ApiOk | {error: string};
+        } catch {
+          setError(
+            res.ok
+              ? 'Invalid response from server.'
+              : `Server error (${res.status}). If this persists after redeploying, check Vercel function logs.`,
+          );
+          return;
+        }
         if (!res.ok) setError((json as {error: string}).error ?? 'Upload failed.');
         else setPayload(json as ApiOk);
       } catch {

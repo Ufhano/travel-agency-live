@@ -1,15 +1,14 @@
-import mammoth from 'mammoth';
 import {NextResponse} from 'next/server';
-import {PDFParse} from 'pdf-parse';
 
 import type {ImportExtractResult} from '@backend/import-parse';
-import {ensurePdfJsWorker} from '@backend/pdf-worker';
 import {
   parseSpreadsheetImportAsync,
   parseUnstructuredImportText,
 } from '@backend/import-parse';
 
 export const runtime = 'nodejs';
+/** Spreadsheet / PDF parsing can exceed the default 10s on large files. */
+export const maxDuration = 60;
 
 const MAX_BYTES = 6 * 1024 * 1024;
 
@@ -45,6 +44,26 @@ function kindLabel(kind: DocFormat): string {
     default:
       return kind;
   }
+}
+
+/** pdf-parse + pdfjs worker break cold starts on Vercel if imported at module scope. */
+async function parsePdfBuffer(buf: Buffer): Promise<ImportExtractResult[]> {
+  const {PDFParse} = await import('pdf-parse');
+  const {ensurePdfJsWorker} = await import('@backend/pdf-worker');
+  ensurePdfJsWorker();
+  const parser = new PDFParse({data: new Uint8Array(buf)});
+  try {
+    const parsed = await parser.getText();
+    return [parseUnstructuredImportText(parsed.text ?? '')];
+  } finally {
+    await parser.destroy();
+  }
+}
+
+async function parseWordBuffer(buf: Buffer): Promise<ImportExtractResult[]> {
+  const mammoth = await import('mammoth');
+  const {value} = await mammoth.extractRawText({buffer: buf});
+  return [parseUnstructuredImportText(value ?? '')];
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -100,17 +119,9 @@ export async function POST(request: Request): Promise<Response> {
     const format = kind;
 
     if (kind === 'pdf') {
-      ensurePdfJsWorker();
-      const parser = new PDFParse({data: new Uint8Array(buf)});
-      try {
-        const parsed = await parser.getText();
-        rows = [parseUnstructuredImportText(parsed.text ?? '')];
-      } finally {
-        await parser.destroy();
-      }
+      rows = await parsePdfBuffer(buf);
     } else if (kind === 'word') {
-      const {value} = await mammoth.extractRawText({buffer: buf});
-      rows = [parseUnstructuredImportText(value ?? '')];
+      rows = await parseWordBuffer(buf);
     } else {
       rows = await parseSpreadsheetImportAsync(buf);
     }

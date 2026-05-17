@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { InvoicePrintBody } from "@/components/invoice-print-body";
 import { InvoiceToolbar } from "@/components/invoice-toolbar";
+import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 
@@ -10,7 +11,7 @@ export default async function InvoiceDetailPage({
   params: Promise<{ paymentId: string }>;
 }) {
   const { paymentId } = await params;
-  const app = await loadAppData();
+  const { data: app, dbError } = await loadAppData();
   const { enrichPayment, getPaymentById } = createCompute(app);
   const payment = getPaymentById(paymentId);
   if (!payment) notFound();
@@ -19,6 +20,7 @@ export default async function InvoiceDetailPage({
 
   return (
     <div className="space-y-6">
+      {dbError ? <DbConnectionBanner message={dbError} /> : null}
       <InvoiceToolbar clientId={ctx.client.id} tripId={ctx.trip.id} />
       <InvoicePrintBody ctx={ctx} />
     </div>

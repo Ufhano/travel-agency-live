@@ -3,68 +3,90 @@ import { getSql } from "./db";
 import type { AppData } from "./app-data";
 import type { Client, Payment, Trip, TripStatus } from "./types";
 
+export type LoadAppDataResult = {
+  data: AppData;
+  /** Set when `DATABASE_URL` is configured but Neon could not be reached. */
+  dbError?: string;
+};
+
+function memoryFallback(): AppData {
+  return { trips: [...trips], clients: [...clients], payments: [...payments] };
+}
+
 /** Neon when `DATABASE_URL` is set; otherwise typed empty fallback from `data.ts`. */
-export async function loadAppData(): Promise<AppData> {
+export async function loadAppData(): Promise<LoadAppDataResult> {
   const sql = getSql();
   if (!sql) {
-    return { trips: [...trips], clients: [...clients], payments: [...payments] };
+    return { data: memoryFallback() };
   }
 
-  const [tripRows, clientRows, paymentRows] = await Promise.all([
-    sql`
-      SELECT id, name, destination, departure_date, capacity, status, accommodation_note
-      FROM trips
-      ORDER BY departure_date ASC
-    `,
-    sql`
-      SELECT id, trip_id, full_name, phone, email, package_price, balance_due_date
-      FROM clients
-    `,
-    sql`
-      SELECT id, invoice_number, client_id, trip_id, amount, paid_at, method, note
-      FROM payments
-      ORDER BY paid_at ASC
-    `,
-  ]);
+  try {
+    const [tripRows, clientRows, paymentRows] = await Promise.all([
+      sql`
+        SELECT id, name, destination, departure_date, capacity, status, accommodation_note
+        FROM trips
+        ORDER BY departure_date ASC
+      `,
+      sql`
+        SELECT id, trip_id, full_name, phone, email, package_price, balance_due_date
+        FROM clients
+      `,
+      sql`
+        SELECT id, invoice_number, client_id, trip_id, amount, paid_at, method, note
+        FROM payments
+        ORDER BY paid_at ASC
+      `,
+    ]);
 
-  const mappedTrips: Trip[] = (tripRows as TripRow[]).map((row) => ({
-    id: row.id,
-    name: row.name,
-    destination: row.destination,
-    departureDate: isoDateSlice(row.departure_date),
-    capacity: Number(row.capacity),
-    status: row.status as TripStatus,
-    accommodationNote: row.accommodation_note,
-  }));
-
-  const mappedClients: Client[] = (clientRows as ClientRow[]).map((row) => ({
-    id: row.id,
-    tripId: row.trip_id,
-    fullName: row.full_name,
-    phone: row.phone,
-    email: row.email,
-    packagePrice: Number(row.package_price),
-    balanceDueDate: isoDateSlice(row.balance_due_date),
-  }));
-
-  const mappedPayments: Payment[] = (paymentRows as PaymentRow[]).map(
-    (row) => ({
+    const mappedTrips: Trip[] = (tripRows as TripRow[]).map((row) => ({
       id: row.id,
-      invoiceNumber: row.invoice_number,
-      clientId: row.client_id,
-      tripId: row.trip_id,
-      amount: Number(row.amount),
-      paidAt: isoDateTime(row.paid_at),
-      method: row.method,
-      note: row.note ?? undefined,
-    }),
-  );
+      name: row.name,
+      destination: row.destination,
+      departureDate: isoDateSlice(row.departure_date),
+      capacity: Number(row.capacity),
+      status: row.status as TripStatus,
+      accommodationNote: row.accommodation_note,
+    }));
 
-  return {
-    trips: mappedTrips,
-    clients: mappedClients,
-    payments: mappedPayments,
-  };
+    const mappedClients: Client[] = (clientRows as ClientRow[]).map((row) => ({
+      id: row.id,
+      tripId: row.trip_id,
+      fullName: row.full_name,
+      phone: row.phone,
+      email: row.email,
+      packagePrice: Number(row.package_price),
+      balanceDueDate: isoDateSlice(row.balance_due_date),
+    }));
+
+    const mappedPayments: Payment[] = (paymentRows as PaymentRow[]).map(
+      (row) => ({
+        id: row.id,
+        invoiceNumber: row.invoice_number,
+        clientId: row.client_id,
+        tripId: row.trip_id,
+        amount: Number(row.amount),
+        paidAt: isoDateTime(row.paid_at),
+        method: row.method,
+        note: row.note ?? undefined,
+      }),
+    );
+
+    return {
+      data: {
+        trips: mappedTrips,
+        clients: mappedClients,
+        payments: mappedPayments,
+      },
+    };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("[loadAppData] Neon query failed:", detail);
+    return {
+      data: memoryFallback(),
+      dbError:
+        "Could not connect to Neon. Check DATABASE_URL in frontend/.env.local, wake the project in the Neon dashboard, and try removing channel_binding=require from the connection string. Visit /api/db-health for details.",
+    };
+  }
 }
 
 type TripRow = {

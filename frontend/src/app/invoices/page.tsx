@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
@@ -15,12 +16,13 @@ import { formatDate, formatZAR } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage() {
-  const data = await loadAppData();
+  const { data, dbError } = await loadAppData();
   const { allPaymentsEnriched } = createCompute(data);
   const rows = allPaymentsEnriched();
 
   return (
     <div className="space-y-6">
+      {dbError ? <DbConnectionBanner message={dbError} /> : null}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           Invoice ledger

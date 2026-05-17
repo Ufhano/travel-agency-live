@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { TripStatusBadge } from "@/components/trip-status-badge";
+import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
@@ -30,7 +31,7 @@ export default async function TripPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const data = await loadAppData();
+  const { data, dbError } = await loadAppData();
   const {
     aggregateTrip,
     balanceForClient,
@@ -45,6 +46,7 @@ export default async function TripPage({
 
   return (
     <div className="space-y-8">
+      {dbError ? <DbConnectionBanner message={dbError} /> : null}
       <Link
         href="/"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

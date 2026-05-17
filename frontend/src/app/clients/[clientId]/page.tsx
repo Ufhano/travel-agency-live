@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { Button } from "@/components/ui/button";
+import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatDate, formatDateTime, formatZAR } from "@/lib/utils";
@@ -22,7 +23,7 @@ export default async function ClientPage({
   params: Promise<{ clientId: string }>;
 }) {
   const { clientId } = await params;
-  const app = await loadAppData();
+  const { data: app, dbError } = await loadAppData();
   const {
     balanceForClient,
     clientPaymentStatus,
@@ -42,6 +43,7 @@ export default async function ClientPage({
 
   return (
     <div className="space-y-8">
+      {dbError ? <DbConnectionBanner message={dbError} /> : null}
       <Link
         href="/clients"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
