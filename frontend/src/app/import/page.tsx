@@ -748,9 +748,6 @@ function ExtractedCard({
             <Field label='Full name' val={row.client.fullName} />
             <Field label='Email' val={row.client.email} />
             <Field label='Phone' val={row.client.phone} />
-            {row.sourceSheet ? (
-              <Field label='Worksheet (tab)' val={row.sourceSheet} />
-            ) : null}
             <Field label='Trip' val={row.client.tripHint} />
             <Field
               label='Package price'
@@ -761,9 +758,11 @@ function ExtractedCard({
             <Field
               label='Balance due'
               val={
-                row.client.balanceDueDate
-                  ? formatDate(row.client.balanceDueDate)
-                  : null
+                row.client.outstandingAmount != null
+                  ? formatZAR(row.client.outstandingAmount)
+                  : row.client.balanceDueDate
+                    ? formatDate(row.client.balanceDueDate)
+                    : null
               }
             />
           </div>

@@ -41,9 +41,16 @@ function pythonArgvCandidates(): string[][] {
   return [["python3"], ["python"]];
 }
 
+export type PythonExcelSheetMeta = {
+  name: string;
+  headerRow: number | null;
+  columnHeaders: string[];
+};
+
 export type PythonExcelResult = {
   ok: boolean;
   rows: Record<string, unknown>[];
+  sheets?: PythonExcelSheetMeta[];
   logs: string[];
   error?: string;
 };
@@ -93,6 +100,11 @@ export async function runPythonExcelExtract(
         const parsed = JSON.parse(stdout.trim()) as {
           ok?: boolean;
           rows?: Record<string, unknown>[];
+          sheets?: {
+            name?: string;
+            header_row?: number | null;
+            column_headers?: string[];
+          }[];
           logs?: string[];
           error?: string;
         };
@@ -103,9 +115,22 @@ export async function runPythonExcelExtract(
             logs: parsed.logs ?? [],
             error: parsed.error ?? "Python reported ok=false",
           };
+        const sheets: PythonExcelSheetMeta[] = Array.isArray(parsed.sheets)
+          ? parsed.sheets
+              .filter((s) => s && typeof s.name === "string")
+              .map((s) => ({
+                name: s.name as string,
+                headerRow:
+                  typeof s.header_row === "number" ? s.header_row : null,
+                columnHeaders: Array.isArray(s.column_headers)
+                  ? s.column_headers.map((h) => String(h ?? ""))
+                  : [],
+              }))
+          : [];
         return {
           ok: true,
           rows: Array.isArray(parsed.rows) ? parsed.rows : [],
+          sheets,
           logs: Array.isArray(parsed.logs) ? parsed.logs : [],
         };
       } catch (e) {

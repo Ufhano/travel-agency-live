@@ -1,6 +1,9 @@
 import {NextResponse} from 'next/server';
 
-import type {ImportExtractResult} from '@backend/import-parse';
+import type {
+  ImportExtractResult,
+  ImportSpreadsheetMeta,
+} from '@backend/import-parse';
 import {
   parseSpreadsheetImportAsync,
   parseUnstructuredImportText,
@@ -116,6 +119,7 @@ export async function POST(request: Request): Promise<Response> {
       );
 
     let rows: ImportExtractResult[];
+    let columnMeta: ImportSpreadsheetMeta | undefined;
     const format = kind;
 
     if (kind === 'pdf') {
@@ -123,7 +127,9 @@ export async function POST(request: Request): Promise<Response> {
     } else if (kind === 'word') {
       rows = await parseWordBuffer(buf);
     } else {
-      rows = await parseSpreadsheetImportAsync(buf);
+      const parsed = await parseSpreadsheetImportAsync(buf);
+      rows = parsed.rows;
+      columnMeta = parsed.columnMeta;
     }
 
     const unstructuredWarning =
@@ -134,6 +140,7 @@ export async function POST(request: Request): Promise<Response> {
       fileName: name,
       count: rows.length,
       rows,
+      ...(columnMeta ? {columnMeta} : {}),
       warnings:
         format === 'pdf' || format === 'word'
           ? [unstructuredWarning]
