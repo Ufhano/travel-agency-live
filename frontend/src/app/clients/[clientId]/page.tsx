@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { Button } from "@/components/ui/button";
+import { DeleteClientButton } from "@/components/delete-client-button";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
@@ -60,11 +61,19 @@ export default async function ClientPage({
           <p className="mt-2 text-sm text-muted-foreground">
             {client.phone} · {client.email}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <PaymentStatusBadge status={status} />
             <Button variant="outline" size="sm" asChild>
               <Link href={`/trips/${trip.id}`}>Trip: {trip.name}</Link>
             </Button>
+            <DeleteClientButton
+              clientId={client.id}
+              clientName={client.fullName}
+              redirectTo="/clients"
+              variant="destructive"
+              size="sm"
+              label="Delete traveller"
+            />
           </div>
         </div>
 

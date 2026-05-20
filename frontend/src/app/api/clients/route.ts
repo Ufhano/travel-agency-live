@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import {
+  deleteClientById,
+  deleteClientsByDestination,
+  deleteClientsByTripId,
+} from "@backend/client-delete";
 import { getSql } from "@backend/db";
 import { clients as memoryClients, trips as memoryTrips } from "@backend/data";
 import type { Client } from "@backend/types";
@@ -105,4 +110,41 @@ export async function POST(request: Request): Promise<Response> {
       { status: 500 },
     );
   }
+}
+
+/**
+ * `DELETE /api/clients?clientId=…` — one traveller.
+ * `DELETE /api/clients?tripId=…` — all travellers on a departure.
+ * `DELETE /api/clients?destination=…` — all travellers on trips with that destination.
+ */
+export async function DELETE(request: Request): Promise<Response> {
+  const { searchParams } = new URL(request.url);
+  const clientId = searchParams.get("clientId")?.trim() ?? "";
+  const tripId = searchParams.get("tripId")?.trim() ?? "";
+  const destination = searchParams.get("destination")?.trim() ?? "";
+
+  const modes = [clientId, tripId, destination].filter(Boolean);
+  if (modes.length !== 1) {
+    return badRequest(
+      "Provide exactly one query parameter: clientId, tripId, or destination.",
+    );
+  }
+
+  const result = clientId
+    ? await deleteClientById(clientId)
+    : tripId
+      ? await deleteClientsByTripId(tripId)
+      : await deleteClientsByDestination(destination);
+
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error },
+      { status: result.status ?? 500 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    deletedCount: result.deletedCount,
+  });
 }

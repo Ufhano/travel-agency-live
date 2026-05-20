@@ -21,6 +21,8 @@ import {
 import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { TripStatusBadge } from "@/components/trip-status-badge";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
+import { DeleteClientButton } from "@/components/delete-client-button";
+import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatDate, formatZAR } from "@/lib/utils";
@@ -148,11 +150,24 @@ export default async function TripPage({
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Travellers on this departure</CardTitle>
-          <CardDescription>
-            Open a name for balances; every payment has its own invoice record.
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="text-lg">Travellers on this departure</CardTitle>
+            <CardDescription>
+              Open a name for balances; every payment has its own invoice record.
+            </CardDescription>
+          </div>
+          {agg.clients.length > 0 ? (
+            <DeleteClientsBulkButton
+              mode={{
+                kind: "trip",
+                tripId: agg.trip.id,
+                label: agg.trip.name,
+                count: agg.clients.length,
+              }}
+              redirectTo="/"
+            />
+          ) : null}
         </CardHeader>
         <CardContent className="p-0 sm:px-6">
           <Table>
@@ -164,6 +179,7 @@ export default async function TripPage({
                 <TableHead className="text-right">Paid</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[72px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -196,6 +212,14 @@ export default async function TripPage({
                     </TableCell>
                     <TableCell>
                       <PaymentStatusBadge status={st} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DeleteClientButton
+                        clientId={c.id}
+                        clientName={c.fullName}
+                        size="icon"
+                        variant="ghost"
+                      />
                     </TableCell>
                   </TableRow>
                 );
