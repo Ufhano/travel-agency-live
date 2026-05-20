@@ -10,13 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaymentStatusBadge } from "@/components/payment-status-badge";
 import { Button } from "@/components/ui/button";
-import { DeleteClientButton } from "@/components/delete-client-button";
+import { ClientDetailToolbar } from "@/components/client-detail-toolbar";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
-import { formatDate, formatDateTime, formatZAR } from "@/lib/utils";
+import { formatDateTime, formatZAR } from "@/lib/utils";
 
 export default async function ClientPage({
   params,
@@ -27,7 +26,6 @@ export default async function ClientPage({
   const { data: app, dbError } = await loadAppData();
   const {
     balanceForClient,
-    clientPaymentStatus,
     enrichPayment,
     getClient,
     getTrip,
@@ -39,7 +37,6 @@ export default async function ClientPage({
   const trip = getTrip(client.tripId)!;
   const paid = totalPaidForClient(client.id);
   const balance = balanceForClient(client);
-  const status = clientPaymentStatus(client);
   const history = paymentsForClient(client.id);
 
   return (
@@ -61,20 +58,12 @@ export default async function ClientPage({
           <p className="mt-2 text-sm text-muted-foreground">
             {client.phone} · {client.email}
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <PaymentStatusBadge status={status} />
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/trips/${trip.id}`}>Trip: {trip.name}</Link>
-            </Button>
-            <DeleteClientButton
-              clientId={client.id}
-              clientName={client.fullName}
-              redirectTo="/clients"
-              variant="destructive"
-              size="sm"
-              label="Delete traveller"
-            />
-          </div>
+          <ClientDetailToolbar
+            client={client}
+            trip={trip}
+            trips={app.trips}
+            balance={balance}
+          />
         </div>
 
         <Card className="w-full lg:max-w-md">

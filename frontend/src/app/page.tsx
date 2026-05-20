@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { ArrowRight, Banknote, Calendar, PiggyBank, Wallet } from "lucide-react";
-import { DashboardChart } from "@/components/dashboard-chart";
+import { DashboardPaymentHero } from "@/components/dashboard-payment-hero";
 import { KeyOperationalInsights } from "@/components/key-operational-insights";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -47,6 +47,14 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      <DashboardPaymentHero
+        paid={summary.totalCollected}
+        total={summary.totalAmountToBePaid}
+        outstanding={summary.totalOutstanding}
+        tripCount={summary.totalTrips}
+        asOfDay={asOfDay}
+      />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Departures"
@@ -77,12 +85,11 @@ export default async function DashboardPage() {
 
       <KeyOperationalInsights insights={keyInsights} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-lg font-semibold">Departures at a glance</h2>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
+      <div id="departures" className="space-y-4">
+        <h2 className="text-lg font-semibold">Departures at a glance</h2>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Trip</TableHead>
@@ -145,8 +152,6 @@ export default async function DashboardPage() {
               </Table>
             </CardContent>
           </Card>
-        </div>
-        <DashboardChart rows={summary.tripAggregates} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

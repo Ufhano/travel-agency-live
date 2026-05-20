@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaymentStatusBadge } from "@/components/payment-status-badge";
+import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
 import { TripStatusBadge } from "@/components/trip-status-badge";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { DeleteClientButton } from "@/components/delete-client-button";
@@ -37,7 +37,6 @@ export default async function TripPage({
   const {
     aggregateTrip,
     balanceForClient,
-    clientPaymentStatus,
     displayTripStatus,
     totalPaidForClient,
   } = createCompute(data);
@@ -186,7 +185,6 @@ export default async function TripPage({
               {agg.clients.map((c) => {
                 const paid = totalPaidForClient(c.id);
                 const bal = balanceForClient(c);
-                const st = clientPaymentStatus(c);
                 return (
                   <TableRow key={c.id}>
                     <TableCell>
@@ -211,7 +209,7 @@ export default async function TripPage({
                       {formatZAR(bal)}
                     </TableCell>
                     <TableCell>
-                      <PaymentStatusBadge status={st} />
+                      <ClientFullyPaidBadge balance={bal} />
                     </TableCell>
                     <TableCell className="text-right">
                       <DeleteClientButton

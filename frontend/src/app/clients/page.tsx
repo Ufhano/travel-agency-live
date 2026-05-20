@@ -8,33 +8,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaymentStatusBadge } from "@/components/payment-status-badge";
+import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
 import { AddClientDialog } from "@/components/add-client-dialog";
+import { ClientRowActions } from "@/components/client-row-actions";
+import { InlineTripNameCell } from "@/components/inline-trip-name-cell";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
-import { DeleteClientButton } from "@/components/delete-client-button";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { createCompute } from "@backend/compute";
 import { loadAppData } from "@backend/load-app-data";
 import { formatZAR } from "@/lib/utils";
+import type { Client, Trip } from "@backend/types";
 
 export const dynamic = "force-dynamic";
 
 type ClientRow = {
-  client: { id: string; fullName: string; packagePrice: number };
-  trip: { id: string; name: string; destination: string };
+  client: Client;
+  trip: Trip;
   paid: number;
   balance: number;
-  status: ReturnType<ReturnType<typeof createCompute>["clientPaymentStatus"]>;
 };
 
 export default async function ClientsPage() {
   const { data, dbError } = await loadAppData();
-  const {
-    balanceForClient,
-    clientPaymentStatus,
-    getTrip,
-    totalPaidForClient,
-  } = createCompute(data);
+  const { balanceForClient, getTrip, totalPaidForClient } = createCompute(data);
   const rows: ClientRow[] = data.clients.flatMap((c) => {
     const trip = getTrip(c.tripId);
     if (!trip) return [];
@@ -44,7 +40,6 @@ export default async function ClientsPage() {
         trip,
         paid: totalPaidForClient(c.id),
         balance: balanceForClient(c),
-        status: clientPaymentStatus(c),
       },
     ];
   });
@@ -133,7 +128,7 @@ export default async function ClientsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {groupRows.map(({ client, trip, paid, balance, status }) => (
+                  {groupRows.map(({ client, trip, paid, balance }) => (
                     <TableRow key={client.id}>
                       <TableCell>
                         <Link
@@ -143,16 +138,17 @@ export default async function ClientsPage() {
                           {client.fullName}
                         </Link>
                         <div className="text-xs text-muted-foreground md:hidden">
-                          {trip.name}
+                          <InlineTripNameCell
+                            tripId={trip.id}
+                            initialName={trip.name}
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        <Link
-                          href={`/trips/${trip.id}`}
-                          className="text-primary hover:underline"
-                        >
-                          {trip.name}
-                        </Link>
+                        <InlineTripNameCell
+                          tripId={trip.id}
+                          initialName={trip.name}
+                        />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatZAR(client.packagePrice)}
@@ -164,15 +160,10 @@ export default async function ClientsPage() {
                         {formatZAR(balance)}
                       </TableCell>
                       <TableCell>
-                        <PaymentStatusBadge status={status} />
+                        <ClientFullyPaidBadge balance={balance} />
                       </TableCell>
                       <TableCell className="text-right">
-                        <DeleteClientButton
-                          clientId={client.id}
-                          clientName={client.fullName}
-                          size="icon"
-                          variant="ghost"
-                        />
+                        <ClientRowActions client={client} trips={data.trips} />
                       </TableCell>
                     </TableRow>
                   ))}

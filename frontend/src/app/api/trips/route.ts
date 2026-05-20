@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getSql } from "@backend/db";
+import { trips as memoryTrips } from "@backend/data";
 import { createTripInNeon, parseCreateTripInput } from "@backend/trip-save";
+import { parseUpdateTripInput, updateTripInNeon } from "@backend/trip-update";
+import type { Trip } from "@backend/types";
 
 export const runtime = "nodejs";
 
@@ -75,4 +78,56 @@ export async function GET() {
   }));
 
   return NextResponse.json({ trips, mode: "neon" as const });
+}
+
+/** Update departure label / destination (e.g. fix import name like “Graskop”). */
+export async function PATCH(request: Request): Promise<Response> {
+  const sql = getSql();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const parsed = parseUpdateTripInput(
+    body && typeof body === "object"
+      ? (body as Parameters<typeof parseUpdateTripInput>[0])
+      : {},
+  );
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
+  const { id, patch } = parsed;
+
+  if (!sql) {
+    const ix = memoryTrips.findIndex((t) => t.id === id);
+    if (ix === -1) {
+      return NextResponse.json({ error: "Trip not found." }, { status: 404 });
+    }
+    const cur = memoryTrips[ix]!;
+    const updated: Trip = {
+      ...cur,
+      ...patch,
+    };
+    memoryTrips[ix] = updated;
+    return NextResponse.json({ ok: true, trip: updated });
+  }
+
+  try {
+    const trip = await updateTripInNeon(sql, id, patch);
+    if (!trip) {
+      return NextResponse.json({ error: "Trip not found." }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, trip });
+  } catch (e) {
+    console.error("[api/trips PATCH]", e);
+    const message = e instanceof Error ? e.message : "Unknown database error.";
+    return NextResponse.json(
+      { error: `Failed to update trip: ${message}` },
+      { status: 500 },
+    );
+  }
 }

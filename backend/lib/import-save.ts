@@ -1,6 +1,6 @@
-import { randomBytes } from "node:crypto";
+import {randomBytes} from 'node:crypto';
 
-import type { ImportExtractResult } from "./import-parse";
+import type {ImportExtractResult} from './import-parse';
 
 type SqlExecutor = (
   strings: TemplateStringsArray,
@@ -8,11 +8,11 @@ type SqlExecutor = (
 ) => Promise<unknown>;
 
 function id(prefix: string): string {
-  return `${prefix}-${randomBytes(9).toString("hex")}`;
+  return `${prefix}-${randomBytes(9).toString('hex')}`;
 }
 
 export function validateImportRow(row: ImportExtractResult): string | null {
-  if (!row.client.fullName?.trim()) return "Missing client full name.";
+  if (!row.client.fullName?.trim()) return 'Missing client full name.';
   return null;
 }
 
@@ -46,30 +46,27 @@ export async function saveImportExtractToNeon(
   tripId: string,
   row: ImportExtractResult,
 ): Promise<
-  | { ok: true; clientId: string; paymentId?: string; paymentError?: string }
-  | { ok: false; error: string }
+  | {ok: true; clientId: string; paymentId?: string; paymentError?: string}
+  | {ok: false; error: string}
 > {
   const v = validateImportRow(row);
-  if (v) return { ok: false, error: v };
+  if (v) return {ok: false, error: v};
 
   const tripCheck = (await sql`
     SELECT id FROM trips WHERE id = ${tripId} LIMIT 1
-  `) as { id: string }[];
-  if (!tripCheck[0]) return { ok: false, error: "Trip not found." };
+  `) as {id: string}[];
+  if (!tripCheck[0]) return {ok: false, error: 'Trip not found.'};
 
-  const clientId = id("c");
+  const clientId = id('c');
   const fullName = row.client.fullName!.trim();
-  const phone = row.client.phone?.trim() || "—";
-  const email = row.client.email?.trim() || "pending@import.local";
+  const phone = row.client.phone?.trim() || '—';
+  const email = row.client.email?.trim() || 'insert@email.com';
   const pkg = Math.max(
     0,
-    Math.round(
-      row.client.packagePrice ??
-        row.payment.amount ??
-        0,
-    ),
+    Math.round(row.client.packagePrice ?? row.payment.amount ?? 0),
   );
-  const balanceDue = parseIsoDateOnly(row.client.balanceDueDate) ?? defaultBalanceDue();
+  const balanceDue =
+    parseIsoDateOnly(row.client.balanceDueDate) ?? defaultBalanceDue();
 
   await sql`
     INSERT INTO clients (id, trip_id, full_name, phone, email, package_price, balance_due_date)
@@ -86,12 +83,12 @@ export async function saveImportExtractToNeon(
 
   const amt = row.payment.amount;
   if (amt != null && amt > 0) {
-    const paymentId = id("p");
+    const paymentId = id('p');
     const baseInv =
       row.payment.invoiceNumber?.trim() ||
-      `IMP-${Date.now()}-${randomBytes(3).toString("hex")}`;
+      `IMP-${Date.now()}-${randomBytes(3).toString('hex')}`;
     const inv = baseInv.slice(0, 120);
-    const method = row.payment.method?.trim() || "Import";
+    const method = row.payment.method?.trim() || 'Import';
     const note = row.payment.note?.trim() || null;
     try {
       await sql`
@@ -107,7 +104,7 @@ export async function saveImportExtractToNeon(
           ${note}
         )
       `;
-      return { ok: true, clientId, paymentId };
+      return {ok: true, clientId, paymentId};
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return {
@@ -118,5 +115,5 @@ export async function saveImportExtractToNeon(
     }
   }
 
-  return { ok: true, clientId };
+  return {ok: true, clientId};
 }

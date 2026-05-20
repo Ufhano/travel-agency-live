@@ -1,126 +1,303 @@
-import type { PaymentWithContext } from "@backend/types";
-import { formatDate, formatDateTime, formatZAR } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
+import type {PaymentWithContext} from '@backend/types';
+import {Dancing_Script} from 'next/font/google';
+import Image from 'next/image';
+import {Mail, MapPin, Phone} from 'lucide-react';
+import {InvoiceDepartureDateCell} from '@/components/invoice-departure-date-cell';
+import {formatDateLong, formatZARInvoice} from '@/lib/utils';
 
-export function InvoicePrintBody({ ctx }: { ctx: PaymentWithContext }) {
+const tagline = Dancing_Script({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+});
+
+const TEAL_DEEP = '#00607A';
+const TEAL_BRIGHT = '#20C9B7';
+
+/** Recognisable WhatsApp brand mark (green); matches common app icon. */
+function WhatsAppMark({className}: {className?: string}) {
+  return (
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      aria-hidden
+      focusable='false'
+    >
+      <path
+        fill='#25D366'
+        d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z'
+      />
+    </svg>
+  );
+}
+
+/** Wording preserved from Mulisa Mapfumo Lesotho template (.docx). */
+const TERMS = [
+  'A non- refundable deposit of R800-00 per person is payable to Secure the booking.',
+  'The remaining amount should be paid in instalments.',
+  'Note that the snow activities are not included on the package',
+  '50% of the about must be paid 2 months before departure',
+  'The full amount must be paid on or before 30 days of departure.',
+  'Cancellations within 30 days of departure results to no refund.',
+  'Cancellations due to what so ever reason when everything has been booked results to no refund, the only option available is for you to get a replacement from your side.',
+  'No moving from one date to another or from one trip to another unless when we suggest it.',
+  'Please note that it is your responsibility to make sure that you have a valid passport during the time of travelling.',
+  'Note that the activities are not compulsory and Nendila Travel & Explorers will not be held responsible for any damages, loss and accidents that may occur during the activities.',
+] as const;
+
+function packageDescription(ctx: PaymentWithContext): string {
+  const parts = [
+    ctx.trip.name,
+    ctx.trip.destination,
+    ctx.trip.accommodationNote?.trim(),
+    ctx.note?.trim(),
+  ].filter((p): p is string => Boolean(p && p.length > 0));
+  if (parts.length === 0) return 'Travel package';
+  return parts.join(' — ');
+}
+
+/** First table column title — matches Word template (e.g. “Lesotho Package”). */
+function packageColumnHeader(ctx: PaymentWithContext): string {
+  const dest = ctx.trip.destination.trim();
+  const name = ctx.trip.name.trim();
+  const combined = `${dest} ${name}`.toLowerCase();
+  if (combined.includes('lesotho')) return 'Lesotho Package';
+  const base = dest || name;
+  if (!base) return 'Package';
+  return /\bpackage\b/i.test(base) ? base : `${base} Package`;
+}
+
+export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
+  const desc = packageDescription(ctx);
+  const packageHeader = packageColumnHeader(ctx);
+
   return (
     <div
-      id="invoice-print"
-      className="mx-auto max-w-3xl rounded-xl border bg-card p-8 shadow-sm print:shadow-none print:border-0"
+      id='invoice-print'
+      className='relative mx-auto max-w-4xl overflow-hidden border border-black/10 bg-white text-[13px] leading-normal text-slate-900 shadow-sm print:mx-0 print:max-w-none print:border-0 print:shadow-none'
+      style={{color: '#0f172a'}}
     >
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Tax invoice / receipt
-          </p>
-          <h1 className="mt-1 font-mono text-2xl font-bold tracking-tight">
-            {ctx.invoiceNumber}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Nendila Travel Explorers · Internal preview (non-production)
-          </p>
-          <p className="mt-3 max-w-md border-l-2 border-primary pl-3 text-xs leading-relaxed text-muted-foreground">
-            <strong className="font-medium text-foreground">
-              Each payment creates a unique invoice record.
-            </strong>{" "}
-            This receipt is one row in the ledger — previous invoices are never
-            replaced when new money comes in.
-          </p>
-        </div>
-        <div className="text-right text-sm">
-          <p>
-            <span className="text-muted-foreground">Issued</span>
-            <br />
-            <span className="font-medium">{formatDate(ctx.paidAt)}</span>
-          </p>
-          <p className="mt-2">
-            <span className="text-muted-foreground">Transaction time</span>
-            <br />
-            <span>{formatDateTime(ctx.paidAt)}</span>
-          </p>
-        </div>
-      </div>
+      {/* Decorative shapes — top left */}
+      <div
+        className='pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full opacity-[0.22] print:opacity-30'
+        style={{
+          background: `radial-gradient(circle, ${TEAL_BRIGHT} 0%, transparent 70%)`,
+        }}
+      />
+      <div
+        className='pointer-events-none absolute -left-8 top-24 h-56 w-56 rounded-full opacity-[0.14] print:opacity-22'
+        style={{
+          background: `radial-gradient(circle, ${TEAL_DEEP} 0%, transparent 68%)`,
+        }}
+      />
+      <div
+        className='pointer-events-none absolute left-32 top-0 h-40 w-[min(55%,20rem)] rounded-bl-[3rem] rounded-tr-[4rem] opacity-[0.12] print:opacity-18'
+        style={{background: TEAL_BRIGHT}}
+      />
 
-      <Separator className="my-6" />
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">
-            Bill to
-          </p>
-          <p className="mt-1 font-semibold">{ctx.client.fullName}</p>
-          <p className="text-sm text-muted-foreground">{ctx.client.email}</p>
-          <p className="text-sm text-muted-foreground">{ctx.client.phone}</p>
-        </div>
-        <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">
-            Trip
-          </p>
-          <p className="mt-1 font-semibold">{ctx.trip.name}</p>
-          <p className="text-sm text-muted-foreground">
-            {ctx.trip.destination}
-          </p>
-          <p className="mt-2 text-sm">
-            <span className="text-muted-foreground">Departure</span>{" "}
-            {formatDate(ctx.trip.departureDate)}
-          </p>
-        </div>
-      </div>
-
-      <Separator className="my-6" />
-
-      <div className="overflow-hidden rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium">Description</th>
-              <th className="px-4 py-3 text-right font-medium">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-t">
-              <td className="px-4 py-3">
-                Travel payment — {ctx.trip.name}
-                {ctx.note ? (
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    {ctx.note}
+      <div className='relative px-8 pb-10 pt-8 sm:px-12 sm:pt-10'>
+        {/* Top bar: logo + INVOICE ribbon + company */}
+        <div className='flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between'>
+          <div className='max-w-md'>
+            <div className='flex items-start gap-4'>
+              <div className='relative h-24 w-24 shrink-0 sm:h-28 sm:w-28'>
+                <Image
+                  src='/nendila-logo.png'
+                  alt='Nendila Travel & Explorers'
+                  fill
+                  className='object-contain'
+                  sizes='(max-width: 640px) 96px, 112px'
+                  priority
+                />
+              </div>
+              <div className='min-w-0 pt-1'>
+                <p
+                  className='text-lg font-bold tracking-tight sm:text-xl'
+                  style={{color: TEAL_DEEP}}
+                >
+                  Nendila Travel & Explorers
+                </p>
+                <p
+                  className={`mt-0.5 text-lg sm:text-xl ${tagline.className}`}
+                  style={{color: TEAL_BRIGHT}}
+                >
+                  Live, Travel & Explore!
+                </p>
+                <p className='mt-2 font-mono text-xs text-slate-600'>
+                  Invoice no.{' '}
+                  <span className='font-semibold text-slate-900'>
+                    {ctx.invoiceNumber}
                   </span>
-                ) : null}
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Method: {ctx.method}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className='flex flex-col items-stretch gap-4 lg:items-end'>
+            <div
+              className='print-color-exact self-end px-10 py-3 text-center text-xl font-bold tracking-[0.2em] text-white'
+              style={{backgroundColor: TEAL_DEEP}}
+            >
+              INVOICE
+            </div>
+
+            <div
+              className='space-y-2.5 text-sm lg:text-right'
+              style={{color: TEAL_DEEP}}
+            >
+              <p className='font-bold leading-snug'>
+                Nendila Travel and Explore (PTY) LTD
+              </p>
+              <p className='text-xs font-medium text-slate-700'>
+                Reg No: 2021/548431/07
+              </p>
+              <ul className='mt-3 space-y-2 text-left text-[13px] text-slate-800 lg:text-right'>
+                <li className='flex gap-2 lg:ml-auto lg:flex-row-reverse lg:justify-end'>
+                  <Mail
+                    className='mt-0.5 h-4 w-4 shrink-0'
+                    style={{color: TEAL_BRIGHT}}
+                  />
+                  <a
+                    href='mailto:Nendila.Travels@gmail.com'
+                    className='break-all underline-offset-2 hover:underline'
+                  >
+                    Nendila.Travels@gmail.com
+                  </a>
+                </li>
+                <li className='flex gap-2 lg:ml-auto lg:flex-row-reverse lg:justify-end'>
+                  <Phone
+                    className='mt-0.5 h-4 w-4 shrink-0'
+                    style={{color: TEAL_BRIGHT}}
+                  />
+                  <span>+27 72 145 8530</span>
+                </li>
+                <li className='flex gap-2 lg:ml-auto lg:flex-row-reverse lg:justify-end'>
+                  <WhatsAppMark className='mt-0.5 h-4 w-4 shrink-0' />
+                  <span>+27 72 145 8530</span>
+                </li>
+                <li className='flex gap-2 lg:ml-auto lg:flex-row-reverse lg:items-start lg:justify-end'>
+                  <MapPin
+                    className='mt-0.5 h-4 w-4 shrink-0'
+                    style={{color: TEAL_BRIGHT}}
+                  />
+                  <span>Unit 214, Airport Park, Germiston, 1400</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Client block */}
+        <div
+          className='mt-10 border-t-2 pt-6'
+          style={{borderColor: `${TEAL_DEEP}33`}}
+        >
+          <div className='grid gap-1 text-sm sm:max-w-lg'>
+            <p>
+              <span className='font-semibold' style={{color: TEAL_DEEP}}>
+                Name of Client:{' '}
+              </span>
+              {ctx.client.fullName}
+            </p>
+            <p>
+              <span className='font-semibold' style={{color: TEAL_DEEP}}>
+                Contacts:{' '}
+              </span>
+              {[ctx.client.phone, ctx.client.email].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        </div>
+
+        {/* Line items table */}
+        <div className='mt-8 overflow-x-auto print:overflow-visible'>
+          <table className='w-full table-fixed border border-black text-left text-[13px]'>
+            <thead>
+              <tr className='border-b border-black bg-slate-50'>
+                <th className='border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  {packageHeader}
+                </th>
+                <th className='w-[11%] border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  Date
+                </th>
+                <th className='w-[13%] border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  Amount paid
+                </th>
+                <th className='w-[9%] border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  No of Clients
+                </th>
+                <th className='w-[14%] border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  Total amount to be paid
+                </th>
+                <th className='w-[13%] px-2 py-2 font-bold sm:px-3'>
+                  Outstanding amount
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className='align-top'>
+                <td className='border-r border-t border-black px-2 py-3 sm:px-3'>
+                  {desc}
+                </td>
+                <td className='border-r border-t border-black px-2 py-3 sm:px-3 align-bottom'>
+                  <InvoiceDepartureDateCell />
+                </td>
+                <td className='border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                  {formatZARInvoice(ctx.amount)}
+                </td>
+                <td className='border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                  1
+                </td>
+                <td className='border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                  {formatZARInvoice(ctx.client.packagePrice)}
+                </td>
+                <td className='border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                  {formatZARInvoice(ctx.balanceAfter)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Terms */}
+        <section className='mt-10 break-inside-avoid border border-slate-200 bg-slate-50/80 p-5 sm:p-6 print:border-black/20 print:bg-white'>
+          <h2
+            className='text-center text-sm font-bold uppercase tracking-wide sm:text-base'
+            style={{color: TEAL_DEEP}}
+          >
+            TERMS AND CONDITIONS
+          </h2>
+          <ol className='mt-4 list-none space-y-2.5 text-[13px] leading-relaxed text-slate-800'>
+            {TERMS.map((t, i) => (
+              <li key={i} className='flex gap-2'>
+                <span className='w-5 shrink-0 font-medium tabular-nums'>
+                  {i + 1}.
                 </span>
-              </td>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                {formatZAR(ctx.amount)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-      <div className="mt-6 grid gap-3 rounded-lg bg-muted/40 p-4 text-sm sm:grid-cols-3">
-        <div>
-          <p className="text-muted-foreground">This payment</p>
-          <p className="text-lg font-bold tabular-nums">{formatZAR(ctx.amount)}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Total paid to date (after)</p>
-          <p className="text-lg font-semibold tabular-nums text-emerald-900 dark:text-emerald-200">
-            {formatZAR(ctx.totalPaidAfter)}
+        <div className='mt-10 flex flex-wrap items-end gap-x-10 gap-y-4 border-t border-slate-200 pt-6 text-sm print:border-black/20'>
+          <p className='min-w-[12rem] flex-1'>
+            <span className='font-semibold' style={{color: TEAL_DEEP}}>
+              Signature:
+            </span>
+            <span className='ml-2 inline-block min-w-[10rem] border-b border-black align-bottom' />
+          </p>
+          <p>
+            <span className='font-semibold' style={{color: TEAL_DEEP}}>
+              Date:
+            </span>
+            <span className='ml-2 tabular-nums'>
+              {formatDateLong(ctx.paidAt)}
+            </span>
           </p>
         </div>
-        <div>
-          <p className="text-muted-foreground">Remaining balance (after)</p>
-          <p className="text-lg font-bold tabular-nums">
-            {formatZAR(ctx.balanceAfter)}
-          </p>
-        </div>
-      </div>
 
-      <p className="mt-8 text-center text-xs text-muted-foreground">
-        Nendila Travel Explorers — payment receipt. Each transaction keeps its own
-        invoice number for audit and client records.
-      </p>
+        <p className='mt-8 text-center text-[11px] text-slate-500 print:text-slate-600'>
+          Nendila Travel & Explorers,thank you for travelling with us.
+        </p>
+      </div>
     </div>
   );
 }

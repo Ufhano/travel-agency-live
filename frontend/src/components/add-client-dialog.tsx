@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { TripPickerField } from "@/components/trip-picker-field";
 
 type TripOption = {
   id: string;
@@ -69,6 +69,10 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
     event.preventDefault();
     if (submitting) return;
     setError(null);
+    if (!trips.some((t) => t.id === form.tripId)) {
+      setError("Choose a departure from the list (search, then select a row).");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/clients", {
@@ -125,24 +129,13 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="add-client-trip">Trip / departure</Label>
-              <select
-                id="add-client-trip"
-                required
-                value={form.tripId}
-                onChange={(e) => update("tripId", e.target.value)}
-                className={cn(
-                  "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                )}
-              >
-                {trips.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} — {t.destination} ({t.departureDate})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <TripPickerField
+              id="add-client-trip"
+              label="Trip / departure"
+              options={trips}
+              value={form.tripId}
+              onChange={(tripId) => update("tripId", tripId)}
+            />
 
             <div className="grid gap-2">
               <Label htmlFor="add-client-name">Full name</Label>

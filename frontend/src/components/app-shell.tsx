@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import {usePathname} from 'next/navigation';
-import {Compass, FileText, LayoutDashboard, Upload, Users} from 'lucide-react';
+import {FileText, LayoutDashboard, Upload, Users} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
-// i
 const nav = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/clients', label: 'Clients', icon: Users},
@@ -17,20 +17,49 @@ export function AppShell({children}: {children: React.ReactNode}) {
   const pathname = usePathname() ?? '/';
   return (
     <div className='min-h-screen bg-background'>
-      <header className='no-print sticky top-0 z-40 border-b bg-card/80 backdrop-blur-md'>
-        <div className='mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6'>
-          <Link href='/' className='flex items-center gap-2 font-semibold'>
-            <span className='flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-              <Compass className='h-5 w-5' aria-hidden />
-            </span>
-            <span className='hidden sm:inline'>
-              Nendila Travel Explorers
-              <span className='ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground'>
-                Operations console
+      <header className='no-print sticky top-0 z-40 border-b border-border/60 bg-card/75 backdrop-blur-md supports-[backdrop-filter]:bg-card/65'>
+        <div className='mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6'>
+          <Link
+            href='/'
+            className={cn(
+              'flex min-h-9 max-w-[min(100%,20rem)] flex-1 shrink items-center gap-0 sm:max-w-none sm:flex-none sm:gap-0',
+              'rounded-xl border border-border/80 bg-gradient-to-b from-card to-card/90 text-card-foreground shadow-sm',
+              'ring-1 ring-black/[0.03] transition-[border-color,box-shadow,background-color] duration-200',
+              'hover:border-border hover:shadow-md',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+              'dark:from-card dark:to-muted/25 dark:ring-white/[0.06]',
+            )}
+          >
+            <span className='flex min-h-9 flex-1 items-center gap-2.5 px-2.5 py-1.5 sm:min-h-10 sm:gap-3 sm:px-3 sm:py-2'>
+              <span className='relative h-8 w-[7.25rem] shrink-0 sm:h-9 sm:w-[8.75rem]'>
+                <Image
+                  src='/nendila-logo.png'
+                  alt='Nendila Travel & Explorers'
+                  fill
+                  className={cn(
+                    'object-contain object-left',
+                    /* Soften flat white in the asset against our surfaces */
+                    'mix-blend-multiply contrast-105 dark:mix-blend-normal dark:contrast-100 dark:brightness-[1.06]',
+                  )}
+                  sizes='(max-width: 640px) 120px, 150px'
+                  priority
+                />
+              </span>
+              <span
+                className='hidden h-6 w-px shrink-0 bg-border/70 sm:block'
+                aria-hidden
+              />
+              <span className='hidden min-w-0 flex-col items-start gap-0.5 sm:flex lg:pr-0.5'>
+                <span className='text-[11px] font-semibold leading-none tracking-tight text-foreground/90'>
+                  Operations
+                </span>
+                <span className='text-[10px] font-normal leading-none text-muted-foreground'>
+                  Console
+                </span>
               </span>
             </span>
           </Link>
-          <nav className='flex items-center gap-1'>
+          <nav className='flex shrink-0 items-center gap-0.5 sm:gap-1'>
             {nav.map(({href, label, icon: Icon}) => {
               const active =
                 href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -39,13 +68,13 @@ export function AppShell({children}: {children: React.ReactNode}) {
                   key={href}
                   href={href}
                   className={cn(
-                    'flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    'flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:px-3',
                     active
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                      ? 'bg-muted/90 text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                   )}
                 >
-                  <Icon className='h-4 w-4' />
+                  <Icon className='h-4 w-4 shrink-0 opacity-90' />
                   <span className='hidden md:inline'>{label}</span>
                 </Link>
               );

@@ -70,6 +70,14 @@
     background: white !important;
   }
 
+  /**
+   * Keep brand colours when printing / saving as PDF (especially Chrome).
+   */
+  .print-color-exact {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   @page {
     margin: 1.2cm;
   }
