@@ -1,0 +1,198 @@
+import { randomBytes } from "node:crypto";
+
+import { bootstrapAdminUser, ensureAuthSchema } from "./auth-schema";
+import { hashPassword, verifyPassword } from "./password";
+
+type SqlExecutor = (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+) => Promise<unknown>;
+
+export type AppUser = {
+  id: string;
+  tenantId: string;
+  username: string;
+  displayName: string;
+  role: "admin" | "user";
+  tenantName: string;
+  createdAt: string;
+};
+
+function id(prefix: string): string {
+  return `${prefix}-${randomBytes(9).toString("hex")}`;
+}
+
+function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  return `${base}-${randomBytes(3).toString("hex")}`;
+}
+
+export async function ensureAuthReady(sql: SqlExecutor) {
+  return bootstrapAdminUser(sql);
+}
+
+export async function authenticateUser(
+  sql: SqlExecutor,
+  username: string,
+  password: string,
+): Promise<AppUser | null> {
+  await ensureAuthReady(sql);
+  const rows = (await sql`
+    SELECT u.id, u.tenant_id, u.username, u.password_hash, u.display_name, u.role, u.created_at, t.name AS tenant_name
+    FROM app_users u
+    JOIN tenants t ON t.id = u.tenant_id
+    WHERE u.username = ${username.trim().toLowerCase()}
+    LIMIT 1
+  `) as {
+    id: string;
+    tenant_id: string;
+    username: string;
+    password_hash: string;
+    display_name: string;
+    role: string;
+    created_at: string | Date;
+    tenant_name: string;
+  }[];
+
+  const row = rows[0];
+  if (!row || !verifyPassword(password, row.password_hash)) return null;
+
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    username: row.username,
+    displayName: row.display_name,
+    role: row.role === "admin" ? "admin" : "user",
+    tenantName: row.tenant_name,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+  };
+}
+
+export async function listUsers(sql: SqlExecutor): Promise<AppUser[]> {
+  await ensureAuthSchema(sql);
+  const rows = (await sql`
+    SELECT u.id, u.tenant_id, u.username, u.display_name, u.role, u.created_at, t.name AS tenant_name
+    FROM app_users u
+    JOIN tenants t ON t.id = u.tenant_id
+    ORDER BY u.created_at ASC
+  `) as {
+    id: string;
+    tenant_id: string;
+    username: string;
+    display_name: string;
+    role: string;
+    created_at: string | Date;
+    tenant_name: string;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    tenantId: row.tenant_id,
+    username: row.username,
+    displayName: row.display_name,
+    role: row.role === "admin" ? "admin" : "user",
+    tenantName: row.tenant_name,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+  }));
+}
+
+export async function createWorkspaceUser(
+  sql: SqlExecutor,
+  input: {
+    username: string;
+    password: string;
+    workspaceName: string;
+    displayName?: string;
+  },
+): Promise<{ ok: true; user: AppUser } | { ok: false; error: string }> {
+  await ensureAuthReady(sql);
+
+  const username = input.username.trim().toLowerCase();
+  const password = input.password;
+  const workspaceName = input.workspaceName.trim();
+  const displayName = input.displayName?.trim() || workspaceName;
+
+  if (!username || username.length < 2) {
+    return { ok: false, error: "Username must be at least 2 characters." };
+  }
+  if (!/^[a-z0-9._-]+$/.test(username)) {
+    return {
+      ok: false,
+      error: "Username may only use letters, numbers, dots, underscores, and hyphens.",
+    };
+  }
+  if (!password || password.length < 4) {
+    return { ok: false, error: "Password must be at least 4 characters." };
+  }
+  if (!workspaceName) {
+    return { ok: false, error: "Workspace name is required." };
+  }
+
+  const taken = (await sql`
+    SELECT id FROM app_users WHERE username = ${username} LIMIT 1
+  `) as { id: string }[];
+  if (taken[0]) {
+    return { ok: false, error: "That username is already taken." };
+  }
+
+  const tenantId = id("ten");
+  const userId = id("u");
+
+  await sql`
+    INSERT INTO tenants (id, name, slug) VALUES (${tenantId}, ${workspaceName}, ${slugify(workspaceName)})
+  `;
+  await sql`
+    INSERT INTO app_users (id, tenant_id, username, password_hash, display_name, role)
+    VALUES (${userId}, ${tenantId}, ${username}, ${hashPassword(password)}, ${displayName}, ${"user"})
+  `;
+
+  return {
+    ok: true,
+    user: {
+      id: userId,
+      tenantId,
+      username,
+      displayName,
+      role: "user",
+      tenantName: workspaceName,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+export async function deleteUserById(
+  sql: SqlExecutor,
+  userId: string,
+  actingUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (userId === actingUserId) {
+    return { ok: false, error: "You cannot delete your own account." };
+  }
+
+  const rows = (await sql`
+    SELECT id, tenant_id, role FROM app_users WHERE id = ${userId} LIMIT 1
+  `) as { id: string; tenant_id: string; role: string }[];
+  const row = rows[0];
+  if (!row) return { ok: false, error: "User not found." };
+  if (row.role === "admin") {
+    return { ok: false, error: "The admin account cannot be deleted." };
+  }
+
+  await sql`DELETE FROM payments WHERE tenant_id = ${row.tenant_id}`;
+  await sql`DELETE FROM clients WHERE tenant_id = ${row.tenant_id}`;
+  await sql`DELETE FROM trips WHERE tenant_id = ${row.tenant_id}`;
+  await sql`DELETE FROM app_users WHERE id = ${userId}`;
+  await sql`DELETE FROM tenants WHERE id = ${row.tenant_id}`;
+
+  return { ok: true };
+}

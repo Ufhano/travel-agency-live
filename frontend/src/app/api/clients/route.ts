@@ -7,7 +7,10 @@ import {
 } from "@backend/client-delete";
 import { clients as memoryClients, payments as memoryPayments, trips as memoryTrips } from "@backend/data";
 import { getSql } from "@backend/db";
+import { memoryTripBelongsToTenant } from "@backend/tenant-access";
+import { getTripTenant } from "@backend/tenant-scope";
 import type { Client } from "@backend/types";
+import { getSession } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 
@@ -86,6 +89,11 @@ function parseClientUpsertFields(body: NewClientInput):
  * in-memory fallback (visible while the dev process is alive).
  */
 export async function POST(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   let body: NewClientInput;
   try {
     body = (await request.json()) as NewClientInput;
@@ -112,25 +120,25 @@ export async function POST(request: Request): Promise<Response> {
   const sql = getSql();
 
   if (!sql) {
-    const tripExists = memoryTrips.some((t) => t.id === tripId);
-    if (!tripExists)
+    if (!memoryTripBelongsToTenant(tripId, session.tenantId)) {
       return badRequest("Selected trip does not exist (in-memory store).");
+    }
     memoryClients.push(newClient);
     return NextResponse.json({ ok: true, client: newClient }, { status: 201 });
   }
 
   try {
     const tripRows = (await sql`
-      SELECT id FROM trips WHERE id = ${tripId} LIMIT 1
+      SELECT id FROM trips WHERE id = ${tripId} AND tenant_id = ${session.tenantId} LIMIT 1
     `) as Array<{ id: string }>;
     if (tripRows.length === 0)
       return badRequest("Selected trip does not exist.");
 
     await sql`
       INSERT INTO clients
-        (id, trip_id, full_name, phone, email, package_price, balance_due_date)
+        (id, tenant_id, trip_id, full_name, phone, email, package_price, balance_due_date)
       VALUES
-        (${id}, ${tripId}, ${fullName}, ${phone}, ${email}, ${packagePrice}, ${balanceDueDate})
+        (${id}, ${session.tenantId}, ${tripId}, ${fullName}, ${phone}, ${email}, ${packagePrice}, ${balanceDueDate})
     `;
 
     return NextResponse.json({ ok: true, client: newClient }, { status: 201 });
@@ -149,6 +157,11 @@ export async function POST(request: Request): Promise<Response> {
  * When `tripId` changes, linked payment rows are updated to the new departure.
  */
 export async function PATCH(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   let body: NewClientInput;
   try {
     body = (await request.json()) as NewClientInput;
@@ -171,9 +184,12 @@ export async function PATCH(request: Request): Promise<Response> {
     if (ix === -1)
       return NextResponse.json({ error: "Client not found." }, { status: 404 });
 
-    const tripExists = memoryTrips.some((t) => t.id === tripId);
-    if (!tripExists)
+    if (!memoryTripBelongsToTenant(tripId, session.tenantId)) {
       return badRequest("Selected trip does not exist (in-memory store).");
+    }
+    if (getTripTenant(memoryClients[ix]!.tripId) !== session.tenantId) {
+      return NextResponse.json({ error: "Client not found." }, { status: 404 });
+    }
 
     const prevTripId = memoryClients[ix]!.tripId;
     const updated: Client = {
@@ -198,7 +214,7 @@ export async function PATCH(request: Request): Promise<Response> {
 
   try {
     const existing = (await sql`
-      SELECT id, trip_id FROM clients WHERE id = ${clientId} LIMIT 1
+      SELECT id, trip_id FROM clients WHERE id = ${clientId} AND tenant_id = ${session.tenantId} LIMIT 1
     `) as Array<{ id: string; trip_id: string }>;
     if (existing.length === 0)
       return NextResponse.json({ error: "Client not found." }, { status: 404 });
@@ -206,7 +222,7 @@ export async function PATCH(request: Request): Promise<Response> {
     const prevTripId = existing[0]!.trip_id;
 
     const tripRows = (await sql`
-      SELECT id FROM trips WHERE id = ${tripId} LIMIT 1
+      SELECT id FROM trips WHERE id = ${tripId} AND tenant_id = ${session.tenantId} LIMIT 1
     `) as Array<{ id: string }>;
     if (tripRows.length === 0)
       return badRequest("Selected trip does not exist.");
@@ -220,14 +236,14 @@ export async function PATCH(request: Request): Promise<Response> {
         email = ${email},
         package_price = ${packagePrice},
         balance_due_date = ${balanceDueDate}
-      WHERE id = ${clientId}
+      WHERE id = ${clientId} AND tenant_id = ${session.tenantId}
     `;
 
     if (tripId !== prevTripId) {
       await sql`
         UPDATE payments
         SET trip_id = ${tripId}
-        WHERE client_id = ${clientId}
+        WHERE client_id = ${clientId} AND tenant_id = ${session.tenantId}
       `;
     }
 
@@ -258,6 +274,11 @@ export async function PATCH(request: Request): Promise<Response> {
  * `DELETE /api/clients?destination=…` — all travellers on trips with that destination.
  */
 export async function DELETE(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const clientId = searchParams.get("clientId")?.trim() ?? "";
   const tripId = searchParams.get("tripId")?.trim() ?? "";
@@ -271,10 +292,10 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   const result = clientId
-    ? await deleteClientById(clientId)
+    ? await deleteClientById(clientId, session.tenantId)
     : tripId
-      ? await deleteClientsByTripId(tripId)
-      : await deleteClientsByDestination(destination);
+      ? await deleteClientsByTripId(tripId, session.tenantId)
+      : await deleteClientsByDestination(destination, session.tenantId);
 
   if (!result.ok) {
     return NextResponse.json(

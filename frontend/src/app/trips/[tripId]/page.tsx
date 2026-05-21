@@ -24,7 +24,7 @@ import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { DeleteClientButton } from "@/components/delete-client-button";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { createCompute } from "@backend/compute";
-import { loadAppData } from "@backend/load-app-data";
+import { loadAppDataForPage } from "@/lib/page-data";
 import { formatDate, formatZAR } from "@/lib/utils";
 
 export default async function TripPage({
@@ -33,7 +33,7 @@ export default async function TripPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const { data, dbError } = await loadAppData();
+  const { data, dbError } = await loadAppDataForPage();
   const {
     aggregateTrip,
     balanceForClient,

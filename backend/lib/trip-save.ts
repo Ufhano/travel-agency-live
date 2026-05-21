@@ -84,15 +84,17 @@ export function parseCreateTripInput(
 
 export async function createTripInNeon(
   sql: SqlExecutor,
+  tenantId: string,
   input: Omit<Trip, "id">,
 ): Promise<Trip> {
   const tripId = id("t");
   await sql`
     INSERT INTO trips
-      (id, name, destination, departure_date, capacity, status, accommodation_note)
+      (id, tenant_id, name, destination, departure_date, capacity, status, accommodation_note)
     VALUES
       (
         ${tripId},
+        ${tenantId},
         ${input.name},
         ${input.destination},
         ${input.departureDate},

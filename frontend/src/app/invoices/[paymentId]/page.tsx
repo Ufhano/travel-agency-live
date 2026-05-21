@@ -3,7 +3,7 @@ import { InvoicePrintBody } from "@/components/invoice-print-body";
 import { InvoiceToolbar } from "@/components/invoice-toolbar";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
-import { loadAppData } from "@backend/load-app-data";
+import { loadAppDataForPage } from "@/lib/page-data";
 
 export default async function InvoiceDetailPage({
   params,
@@ -11,7 +11,7 @@ export default async function InvoiceDetailPage({
   params: Promise<{ paymentId: string }>;
 }) {
   const { paymentId } = await params;
-  const { data: app, dbError } = await loadAppData();
+  const { data: app, dbError } = await loadAppDataForPage();
   const { enrichPayment, getPaymentById } = createCompute(app);
   const payment = getPaymentById(paymentId);
   if (!payment) notFound();

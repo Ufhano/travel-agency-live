@@ -1,5 +1,6 @@
 import { trips, clients, payments } from "./data";
 import { getSql } from "./db";
+import { tripTenantById } from "./tenant-scope";
 import type { AppData } from "./app-data";
 import type { Client, Payment, Trip, TripStatus } from "./types";
 
@@ -9,15 +10,28 @@ export type LoadAppDataResult = {
   dbError?: string;
 };
 
-function memoryFallback(): AppData {
-  return { trips: [...trips], clients: [...clients], payments: [...payments] };
+function memoryFallback(tenantId: string): AppData {
+  const tenantTripIds = new Set(
+    trips
+      .filter((t) => tripTenantById.get(t.id) === tenantId)
+      .map((t) => t.id),
+  );
+  const tenantClients = clients.filter((c) => tenantTripIds.has(c.tripId));
+  const tenantClientIds = new Set(tenantClients.map((c) => c.id));
+  return {
+    trips: trips.filter((t) => tenantTripIds.has(t.id)),
+    clients: tenantClients,
+    payments: payments.filter(
+      (p) => tenantTripIds.has(p.tripId) && tenantClientIds.has(p.clientId),
+    ),
+  };
 }
 
 /** Neon when `DATABASE_URL` is set; otherwise typed empty fallback from `data.ts`. */
-export async function loadAppData(): Promise<LoadAppDataResult> {
+export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> {
   const sql = getSql();
   if (!sql) {
-    return { data: memoryFallback() };
+    return { data: memoryFallback(tenantId) };
   }
 
   try {
@@ -25,15 +39,18 @@ export async function loadAppData(): Promise<LoadAppDataResult> {
       sql`
         SELECT id, name, destination, departure_date, capacity, status, accommodation_note
         FROM trips
+        WHERE tenant_id = ${tenantId}
         ORDER BY departure_date ASC
       `,
       sql`
         SELECT id, trip_id, full_name, phone, email, package_price, balance_due_date
         FROM clients
+        WHERE tenant_id = ${tenantId}
       `,
       sql`
         SELECT id, invoice_number, client_id, trip_id, amount, paid_at, method, note
         FROM payments
+        WHERE tenant_id = ${tenantId}
         ORDER BY paid_at ASC
       `,
     ]);
@@ -82,7 +99,7 @@ export async function loadAppData(): Promise<LoadAppDataResult> {
     const detail = e instanceof Error ? e.message : String(e);
     console.error("[loadAppData] Neon query failed:", detail);
     return {
-      data: memoryFallback(),
+      data: memoryFallback(tenantId),
       dbError:
         "Could not connect to Neon. Check DATABASE_URL in frontend/.env.local, wake the project in the Neon dashboard, and try removing channel_binding=require from the connection string. Visit /api/db-health for details.",
     };

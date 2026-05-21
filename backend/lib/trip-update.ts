@@ -51,12 +51,13 @@ export function parseUpdateTripInput(
 
 export async function updateTripInNeon(
   sql: SqlExecutor,
+  tenantId: string,
   id: string,
   patch: Partial<Pick<Trip, "name" | "destination" | "departureDate">>,
 ): Promise<Trip | null> {
   const existing = (await sql`
     SELECT id, name, destination, departure_date, capacity, status, accommodation_note
-    FROM trips WHERE id = ${id} LIMIT 1
+    FROM trips WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1
   `) as Array<{
     id: string;
     name: string;
@@ -80,7 +81,7 @@ export async function updateTripInNeon(
       name = ${name},
       destination = ${destination},
       departure_date = ${departureDate}
-    WHERE id = ${id}
+    WHERE id = ${id} AND tenant_id = ${tenantId}
   `;
 
   return {

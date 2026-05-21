@@ -1,5 +1,6 @@
 import { getSql } from "./db";
 import { clients as memoryClients, payments as memoryPayments, trips as memoryTrips } from "./data";
+import { getTripTenant, tripTenantById } from "./tenant-scope";
 
 export type DeleteClientsResult =
   | { ok: true; deletedCount: number }
@@ -22,20 +23,33 @@ function removeClientsFromMemory(
   return ids.size;
 }
 
-export async function deleteClientById(clientId: string): Promise<DeleteClientsResult> {
+function memoryClientInTenant(clientId: string, tenantId: string): boolean {
+  const client = memoryClients.find((c) => c.id === clientId);
+  if (!client) return false;
+  return getTripTenant(client.tripId) === tenantId;
+}
+
+export async function deleteClientById(
+  clientId: string,
+  tenantId: string,
+): Promise<DeleteClientsResult> {
   const id = clientId.trim();
   if (!id) return { ok: false, error: "Client id is required.", status: 400 };
 
   const sql = getSql();
   if (!sql) {
-    const n = removeClientsFromMemory((c) => c.id === id);
-    if (n === 0) return { ok: false, error: "Client not found.", status: 404 };
+    if (!memoryClientInTenant(id, tenantId)) {
+      return { ok: false, error: "Client not found.", status: 404 };
+    }
+    const n = removeClientsFromMemory(
+      (c) => c.id === id && getTripTenant(c.tripId) === tenantId,
+    );
     return { ok: true, deletedCount: n };
   }
 
   try {
     const rows = (await sql`
-      DELETE FROM clients WHERE id = ${id} RETURNING id
+      DELETE FROM clients WHERE id = ${id} AND tenant_id = ${tenantId} RETURNING id
     `) as Array<{ id: string }>;
     if (rows.length === 0)
       return { ok: false, error: "Client not found.", status: 404 };
@@ -50,27 +64,31 @@ export async function deleteClientById(clientId: string): Promise<DeleteClientsR
   }
 }
 
-export async function deleteClientsByTripId(tripId: string): Promise<DeleteClientsResult> {
+export async function deleteClientsByTripId(
+  tripId: string,
+  tenantId: string,
+): Promise<DeleteClientsResult> {
   const id = tripId.trim();
   if (!id) return { ok: false, error: "Trip id is required.", status: 400 };
 
   const sql = getSql();
   if (!sql) {
-    const tripExists = memoryTrips.some((t) => t.id === id);
-    if (!tripExists) return { ok: false, error: "Trip not found.", status: 404 };
+    if (getTripTenant(id) !== tenantId) {
+      return { ok: false, error: "Trip not found.", status: 404 };
+    }
     const n = removeClientsFromMemory((c) => c.tripId === id);
     return { ok: true, deletedCount: n };
   }
 
   try {
     const tripRows = (await sql`
-      SELECT id FROM trips WHERE id = ${id} LIMIT 1
+      SELECT id FROM trips WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1
     `) as Array<{ id: string }>;
     if (tripRows.length === 0)
       return { ok: false, error: "Trip not found.", status: 404 };
 
     const rows = (await sql`
-      DELETE FROM clients WHERE trip_id = ${id} RETURNING id
+      DELETE FROM clients WHERE trip_id = ${id} AND tenant_id = ${tenantId} RETURNING id
     `) as Array<{ id: string }>;
     return { ok: true, deletedCount: rows.length };
   } catch (e) {
@@ -85,6 +103,7 @@ export async function deleteClientsByTripId(tripId: string): Promise<DeleteClien
 
 export async function deleteClientsByDestination(
   destination: string,
+  tenantId: string,
 ): Promise<DeleteClientsResult> {
   const dest = destination.trim();
   if (!dest) return { ok: false, error: "Destination is required.", status: 400 };
@@ -92,7 +111,9 @@ export async function deleteClientsByDestination(
   const sql = getSql();
   if (!sql) {
     const tripIds = new Set(
-      memoryTrips.filter((t) => t.destination === dest).map((t) => t.id),
+      memoryTrips
+        .filter((t) => t.destination === dest && tripTenantById.get(t.id) === tenantId)
+        .map((t) => t.id),
     );
     if (tripIds.size === 0)
       return { ok: false, error: "No trips found for that destination.", status: 404 };
@@ -103,9 +124,10 @@ export async function deleteClientsByDestination(
   try {
     const rows = (await sql`
       DELETE FROM clients
-      WHERE trip_id IN (
-        SELECT id FROM trips WHERE destination = ${dest}
-      )
+      WHERE tenant_id = ${tenantId}
+        AND trip_id IN (
+          SELECT id FROM trips WHERE destination = ${dest} AND tenant_id = ${tenantId}
+        )
       RETURNING id
     `) as Array<{ id: string }>;
     if (rows.length === 0)

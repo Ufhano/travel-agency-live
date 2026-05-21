@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSql } from "@backend/db";
 import type { ImportExtractResult } from "@backend/import-parse";
 import { saveImportExtractToNeon } from "@backend/import-save";
+import { getSession } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,11 @@ type Body = {
 };
 
 export async function POST(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const sql = getSql();
   if (!sql) {
     return NextResponse.json(
@@ -42,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const r = await saveImportExtractToNeon(sql, tripId, row);
+    const r = await saveImportExtractToNeon(sql, session.tenantId, tripId, row);
     if (r.ok) {
       saved.push({
         clientId: r.clientId,

@@ -15,7 +15,7 @@ import { InlineTripNameCell } from "@/components/inline-trip-name-cell";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { createCompute } from "@backend/compute";
-import { loadAppData } from "@backend/load-app-data";
+import { loadAppDataForPage } from "@/lib/page-data";
 import { formatZAR } from "@/lib/utils";
 import type { Client, Trip } from "@backend/types";
 
@@ -29,7 +29,7 @@ type ClientRow = {
 };
 
 export default async function ClientsPage() {
-  const { data, dbError } = await loadAppData();
+  const { data, dbError } = await loadAppDataForPage();
   const { balanceForClient, getTrip, totalPaidForClient } = createCompute(data);
   const rows: ClientRow[] = data.clients.flatMap((c) => {
     const trip = getTrip(c.tripId);

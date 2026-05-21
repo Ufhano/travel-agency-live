@@ -2,14 +2,21 @@ import { NextResponse } from "next/server";
 
 import { getSql } from "@backend/db";
 import { trips as memoryTrips } from "@backend/data";
+import { memoryTripBelongsToTenant } from "@backend/tenant-access";
 import { createTripInNeon, parseCreateTripInput } from "@backend/trip-save";
 import { parseUpdateTripInput, updateTripInNeon } from "@backend/trip-update";
 import type { Trip } from "@backend/types";
+import { getSession } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 
 /** Create a departure (required before saving imported travellers). */
 export async function POST(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const sql = getSql();
   if (!sql) {
     return NextResponse.json(
@@ -33,7 +40,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const trip = await createTripInNeon(sql, parsed.trip);
+    const trip = await createTripInNeon(sql, session.tenantId, parsed.trip);
     return NextResponse.json({ ok: true, trip }, { status: 201 });
   } catch (e) {
     console.error("[api/trips POST]", e);
@@ -47,18 +54,28 @@ export async function POST(request: Request): Promise<Response> {
 
 /** Minimal trip list for assignment dropdowns (e.g. import save). */
 export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const sql = getSql();
   if (!sql) {
-    return NextResponse.json({
-      trips: [] as { id: string; name: string; destination: string; departureDate: string }[],
-      mode: "static" as const,
-      message: "DATABASE_URL not set — no trips to load.",
-    });
+    const trips = memoryTrips
+      .filter((t) => memoryTripBelongsToTenant(t.id, session.tenantId))
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        destination: t.destination,
+        departureDate: t.departureDate,
+      }));
+    return NextResponse.json({ trips, mode: "static" as const });
   }
 
   const rows = (await sql`
     SELECT id, name, destination, departure_date
     FROM trips
+    WHERE tenant_id = ${session.tenantId}
     ORDER BY departure_date ASC
   `) as {
     id: string;
@@ -82,6 +99,11 @@ export async function GET() {
 
 /** Update departure label / destination (e.g. fix import name like “Graskop”). */
 export async function PATCH(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const sql = getSql();
 
   let body: unknown;
@@ -103,6 +125,9 @@ export async function PATCH(request: Request): Promise<Response> {
   const { id, patch } = parsed;
 
   if (!sql) {
+    if (!memoryTripBelongsToTenant(id, session.tenantId)) {
+      return NextResponse.json({ error: "Trip not found." }, { status: 404 });
+    }
     const ix = memoryTrips.findIndex((t) => t.id === id);
     if (ix === -1) {
       return NextResponse.json({ error: "Trip not found." }, { status: 404 });
@@ -117,7 +142,7 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   try {
-    const trip = await updateTripInNeon(sql, id, patch);
+    const trip = await updateTripInNeon(sql, session.tenantId, id, patch);
     if (!trip) {
       return NextResponse.json({ error: "Trip not found." }, { status: 404 });
     }

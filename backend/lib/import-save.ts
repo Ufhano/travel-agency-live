@@ -43,6 +43,7 @@ function paidAtIso(row: ImportExtractResult): string {
  */
 export async function saveImportExtractToNeon(
   sql: SqlExecutor,
+  tenantId: string,
   tripId: string,
   row: ImportExtractResult,
 ): Promise<
@@ -53,7 +54,7 @@ export async function saveImportExtractToNeon(
   if (v) return {ok: false, error: v};
 
   const tripCheck = (await sql`
-    SELECT id FROM trips WHERE id = ${tripId} LIMIT 1
+    SELECT id FROM trips WHERE id = ${tripId} AND tenant_id = ${tenantId} LIMIT 1
   `) as {id: string}[];
   if (!tripCheck[0]) return {ok: false, error: 'Trip not found.'};
 
@@ -69,9 +70,10 @@ export async function saveImportExtractToNeon(
     parseIsoDateOnly(row.client.balanceDueDate) ?? defaultBalanceDue();
 
   await sql`
-    INSERT INTO clients (id, trip_id, full_name, phone, email, package_price, balance_due_date)
+    INSERT INTO clients (id, tenant_id, trip_id, full_name, phone, email, package_price, balance_due_date)
     VALUES (
       ${clientId},
+      ${tenantId},
       ${tripId},
       ${fullName},
       ${phone},
@@ -92,9 +94,10 @@ export async function saveImportExtractToNeon(
     const note = row.payment.note?.trim() || null;
     try {
       await sql`
-        INSERT INTO payments (id, invoice_number, client_id, trip_id, amount, paid_at, method, note)
+        INSERT INTO payments (id, tenant_id, invoice_number, client_id, trip_id, amount, paid_at, method, note)
         VALUES (
           ${paymentId},
+          ${tenantId},
           ${inv},
           ${clientId},
           ${tripId},

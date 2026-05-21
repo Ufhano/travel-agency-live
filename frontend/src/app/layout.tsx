@@ -1,6 +1,8 @@
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import {AppShell} from '@/components/app-shell';
+import {isAuthEnabled} from '@/lib/auth-config';
+import {getSession} from '@/lib/auth-server';
 import './globals.css';
 
 const geistSans = Geist({
@@ -23,15 +25,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+
   return (
     <html lang='en'>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans`}>
-        <AppShell>{children}</AppShell>
+        <AppShell authEnabled={isAuthEnabled()} session={session}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

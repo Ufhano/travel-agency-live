@@ -2,9 +2,18 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import {usePathname} from 'next/navigation';
-import {FileText, LayoutDashboard, Upload, Users} from 'lucide-react';
+import {usePathname, useRouter} from 'next/navigation';
+import {
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Upload,
+  Users,
+} from 'lucide-react';
+import {Button} from '@/components/ui/button';
 import {cn} from '@/lib/utils';
+import type {SessionPayload} from '@/lib/session-token';
 
 const nav = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
@@ -13,8 +22,33 @@ const nav = [
   {href: '/import', label: 'Import', icon: Upload},
 ];
 
-export function AppShell({children}: {children: React.ReactNode}) {
+export function AppShell({
+  children,
+  authEnabled = false,
+  session = null,
+}: {
+  children: React.ReactNode;
+  authEnabled?: boolean;
+  session?: SessionPayload | null;
+}) {
   const pathname = usePathname() ?? '/';
+  const router = useRouter();
+
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
+
+  const links =
+    session?.role === 'admin'
+      ? [...nav, {href: '/settings', label: 'Settings', icon: Settings}]
+      : nav;
+
+  async function signOut() {
+    await fetch('/api/auth/logout', {method: 'POST'});
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
     <div className='min-h-screen bg-background'>
       <header className='no-print sticky top-0 z-40 border-b border-border/60 bg-card/75 backdrop-blur-md supports-[backdrop-filter]:bg-card/65'>
@@ -38,7 +72,6 @@ export function AppShell({children}: {children: React.ReactNode}) {
                   fill
                   className={cn(
                     'object-contain object-left',
-                    /* Soften flat white in the asset against our surfaces */
                     'mix-blend-multiply contrast-105 dark:mix-blend-normal dark:contrast-100 dark:brightness-[1.06]',
                   )}
                   sizes='(max-width: 640px) 120px, 150px'
@@ -51,16 +84,16 @@ export function AppShell({children}: {children: React.ReactNode}) {
               />
               <span className='hidden min-w-0 flex-col items-start gap-0.5 sm:flex lg:pr-0.5'>
                 <span className='text-[11px] font-semibold leading-none tracking-tight text-foreground/90'>
-                  Operations
+                  {session?.displayName ?? 'Operations'}
                 </span>
                 <span className='text-[10px] font-normal leading-none text-muted-foreground'>
-                  Console
+                  {session?.role === 'admin' ? 'Administrator' : 'Workspace'}
                 </span>
               </span>
             </span>
           </Link>
           <nav className='flex shrink-0 items-center gap-0.5 sm:gap-1'>
-            {nav.map(({href, label, icon: Icon}) => {
+            {links.map(({href, label, icon: Icon}) => {
               const active =
                 href === '/' ? pathname === '/' : pathname.startsWith(href);
               return (
@@ -79,6 +112,19 @@ export function AppShell({children}: {children: React.ReactNode}) {
                 </Link>
               );
             })}
+            {authEnabled ? (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='ml-1 text-muted-foreground hover:text-foreground'
+                onClick={() => void signOut()}
+                title='Sign out'
+              >
+                <LogOut className='h-4 w-4' />
+                <span className='hidden lg:inline'>Sign out</span>
+              </Button>
+            ) : null}
           </nav>
         </div>
       </header>
