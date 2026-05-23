@@ -6,7 +6,7 @@ export async function getSession(): Promise<SessionPayload | null> {
   if (!isAuthEnabled()) return null;
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  return parseSessionToken(token, getAuthSecret());
+  return await parseSessionToken(token, getAuthSecret());
 }
 
 export async function requireSession(): Promise<SessionPayload> {

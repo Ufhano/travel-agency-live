@@ -7,7 +7,8 @@
     "build": "npm run build --workspace frontend",
     "start": "npm run start --workspace frontend",
     "lint": "npm run lint --workspace frontend",
-    "db:wipe": "tsx backend/scripts/wipe-neon.ts"
+    "db:wipe": "tsx backend/scripts/wipe-neon.ts",
+    "db:reset-admin": "tsx backend/scripts/reset-admin-password.ts"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

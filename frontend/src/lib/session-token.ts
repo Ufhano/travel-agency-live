@@ -31,6 +31,9 @@ async function hmacSha256Hex(message: string, secret: string): Promise<string> {
 }
 
 function b64urlEncode(text: string): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(text, "utf8").toString("base64url");
+  }
   const bytes = new TextEncoder().encode(text);
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
@@ -38,6 +41,12 @@ function b64urlEncode(text: string): string {
 }
 
 function b64urlDecode(encoded: string): string {
+  if (typeof Buffer !== "undefined") {
+    const padded = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const pad =
+      padded.length % 4 === 0 ? padded : padded + "=".repeat(4 - (padded.length % 4));
+    return Buffer.from(pad, "base64").toString("utf8");
+  }
   const padded = encoded.replace(/-/g, "+").replace(/_/g, "/");
   const pad = padded.length % 4 === 0 ? padded : padded + "=".repeat(4 - (padded.length % 4));
   const binary = atob(pad);
@@ -87,4 +96,18 @@ export async function parseSessionToken(
   } catch {
     return null;
   }
+}
+
+/** Safe to pass from Server Components into client components. */
+export type ClientSession = Omit<SessionPayload, "exp">;
+
+export function toClientSession(session: SessionPayload | null): ClientSession | null {
+  if (!session) return null;
+  return {
+    userId: session.userId,
+    tenantId: session.tenantId,
+    role: session.role,
+    username: session.username,
+    displayName: session.displayName,
+  };
 }

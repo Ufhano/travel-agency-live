@@ -3,6 +3,7 @@ import {Geist, Geist_Mono} from 'next/font/google';
 import {AppShell} from '@/components/app-shell';
 import {isAuthEnabled} from '@/lib/auth-config';
 import {getSession} from '@/lib/auth-server';
+import {toClientSession} from '@/lib/session-token';
 import './globals.css';
 
 const geistSans = Geist({
@@ -30,12 +31,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getSession();
+  let clientSession = null;
+  try {
+    clientSession = toClientSession(await getSession());
+  } catch {
+    clientSession = null;
+  }
 
   return (
     <html lang='en'>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans`}>
-        <AppShell authEnabled={isAuthEnabled()} session={session}>
+        <AppShell authEnabled={isAuthEnabled()} session={clientSession}>
           {children}
         </AppShell>
       </body>

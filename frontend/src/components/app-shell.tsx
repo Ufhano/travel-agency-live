@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {cn} from '@/lib/utils';
-import type {SessionPayload} from '@/lib/session-token';
+import type {ClientSession} from '@/lib/session-token';
 
 const nav = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
@@ -29,7 +29,7 @@ export function AppShell({
 }: {
   children: React.ReactNode;
   authEnabled?: boolean;
-  session?: SessionPayload | null;
+  session?: ClientSession | null;
 }) {
   const pathname = usePathname() ?? '/';
   const router = useRouter();

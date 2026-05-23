@@ -200,6 +200,7 @@ export function DashboardPaymentHero({
   outstanding,
   tripCount,
   asOfDay,
+  displayName,
   className,
 }: {
   paid: number;
@@ -207,6 +208,7 @@ export function DashboardPaymentHero({
   outstanding: number;
   tripCount: number;
   asOfDay: string;
+  displayName: string;
   className?: string;
 }) {
   const percentPaid = total > 0 ? Math.round((paid / total) * 100) : 0;
@@ -232,7 +234,7 @@ export function DashboardPaymentHero({
         <div className="max-w-lg text-white">
           <p className="text-lg font-medium text-white/80 sm:text-xl">Welcome,</p>
           <h2 className="mt-1 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            Payment overview
+            {displayName}
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-white/65 sm:text-base">
             Across {tripLabel}, travellers have paid{" "}

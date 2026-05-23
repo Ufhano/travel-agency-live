@@ -1,9 +1,6 @@
 import Image from "next/image";
 import { Suspense } from "react";
 import { Caveat } from "next/font/google";
-import { bootstrapMemoryAuth } from "@backend/auth-memory";
-import { getSql } from "@backend/db";
-import { ensureAuthReady } from "@backend/users";
 import { LoginForm } from "@/components/login-form";
 
 const caveat = Caveat({
@@ -11,9 +8,8 @@ const caveat = Caveat({
   weight: ["600", "700"],
 });
 
-export default async function LoginPage() {
-  const sql = getSql();
-  const admin = sql ? await ensureAuthReady(sql) : bootstrapMemoryAuth();
+export default function LoginPage() {
+  const adminUsername = (process.env.ADMIN_USERNAME?.trim() || "admin").toLowerCase();
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef1f2] px-4 py-12">
@@ -56,13 +52,14 @@ export default async function LoginPage() {
             Sign in to your workspace. Admin accounts can create users in Settings.
           </p>
           <p className="mt-3 rounded-lg bg-teal-50/90 px-3 py-2 text-center text-xs text-teal-900/70">
-            Default admin: <strong>{admin.username}</strong> — password from{" "}
-            <code className="rounded bg-white/80 px-1">ADMIN_PASSWORD</code> (or{" "}
-            <strong>admin</strong> locally)
+            Admin username: <strong>{adminUsername}</strong> — password is{" "}
+            <code className="rounded bg-white/80 px-1">ADMIN_PASSWORD</code> in{" "}
+            <code className="rounded bg-white/80 px-1">.env.local</code> (default{" "}
+            <strong>admin</strong>)
           </p>
           <div className="mt-6">
             <Suspense fallback={<div className="h-40 animate-pulse rounded-lg bg-teal-50" />}>
-              <LoginForm defaultUsername={admin.username} />
+              <LoginForm defaultUsername={adminUsername} />
             </Suspense>
           </div>
         </div>

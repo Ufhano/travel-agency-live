@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const asOfDay = formatDate(new Date().toISOString().slice(0, 10));
 
-  const { data, dbError } = await loadAppDataForPage();
+  const { data, dbError, session } = await loadAppDataForPage();
   const {
     aggregateTrip,
     buildKeyOperationalInsights,
@@ -53,6 +53,7 @@ export default async function DashboardPage() {
         outstanding={summary.totalOutstanding}
         tripCount={summary.totalTrips}
         asOfDay={asOfDay}
+        displayName={session.displayName}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
