@@ -1,14 +1,15 @@
 import { signSession } from "@/lib/session-token";
-import { SESSION_COOKIE, getAuthSecret } from "@/lib/auth-config";
+import { SESSION_COOKIE, isAuthEnabled } from "@/lib/auth-config";
+import { getAuthSecretForNode } from "@/lib/auth-secret-node";
 
-export { SESSION_COOKIE, getAuthSecret, isAuthEnabled } from "@/lib/auth-config";
+export { SESSION_COOKIE, isAuthEnabled } from "@/lib/auth-config";
 
 export type { SessionPayload, UserRole } from "@/lib/session-token";
 
 export async function createSessionToken(
   payload: Omit<import("@/lib/session-token").SessionPayload, "exp">,
 ): Promise<string> {
-  return signSession(payload, getAuthSecret());
+  return signSession(payload, getAuthSecretForNode());
 }
 
 export function sessionCookieOptions(maxAgeSec: number) {

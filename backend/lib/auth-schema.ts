@@ -61,15 +61,7 @@ export async function bootstrapAdminUser(sql: SqlExecutor): Promise<BootstrapAdm
 
   if (existing[0]) {
     const tenantId = existing[0].tenant_id;
-    await sql`
-      UPDATE trips SET tenant_id = ${tenantId} WHERE tenant_id IS NULL
-    `;
-    await sql`
-      UPDATE clients SET tenant_id = ${tenantId} WHERE tenant_id IS NULL
-    `;
-    await sql`
-      UPDATE payments SET tenant_id = ${tenantId} WHERE tenant_id IS NULL
-    `;
+    await backfillTenantIds(sql, tenantId);
     return {
       userId: existing[0].id,
       tenantId,
@@ -94,9 +86,25 @@ export async function bootstrapAdminUser(sql: SqlExecutor): Promise<BootstrapAdm
     VALUES (${userId}, ${tenantId}, ${username}, ${hashPassword(password)}, ${"Administrator"}, ${"admin"})
   `;
 
-  await sql`UPDATE trips SET tenant_id = ${tenantId} WHERE tenant_id IS NULL`;
-  await sql`UPDATE clients SET tenant_id = ${tenantId} WHERE tenant_id IS NULL`;
-  await sql`UPDATE payments SET tenant_id = ${tenantId} WHERE tenant_id IS NULL`;
+  await backfillTenantIds(sql, tenantId);
 
   return { userId, tenantId, username };
+}
+
+async function backfillTenantIds(sql: SqlExecutor, tenantId: string): Promise<void> {
+  try {
+    await sql`UPDATE trips SET tenant_id = ${tenantId} WHERE tenant_id IS NULL`;
+  } catch {
+    /* trips table may predate tenant_id column on some branches */
+  }
+  try {
+    await sql`UPDATE clients SET tenant_id = ${tenantId} WHERE tenant_id IS NULL`;
+  } catch {
+    /* ignore */
+  }
+  try {
+    await sql`UPDATE payments SET tenant_id = ${tenantId} WHERE tenant_id IS NULL`;
+  } catch {
+    /* ignore */
+  }
 }
