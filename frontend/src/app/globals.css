@@ -62,12 +62,40 @@
 }
 
 @media print {
+  /**
+   * Print only the invoice — keeps the exact on-screen layout (logo, colours, fonts).
+   */
+  body * {
+    visibility: hidden;
+  }
+
+  #invoice-print,
+  #invoice-print * {
+    visibility: visible;
+  }
+
+  #invoice-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
   .no-print {
     display: none !important;
   }
 
   body {
     background: white !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
   }
 
   /**
@@ -80,5 +108,44 @@
 
   @page {
     margin: 1.2cm;
+  }
+
+  #invoice-print .invoice-table {
+    font-size: 11px;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  #invoice-print .invoice-table th,
+  #invoice-print .invoice-table td {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
+    line-height: 1.35;
+  }
+
+  #invoice-print .invoice-col-package {
+    width: 26%;
+  }
+
+  #invoice-print .invoice-col-date {
+    width: 14%;
+    padding-right: 0.35rem !important;
+  }
+
+  #invoice-print .invoice-col-paid {
+    width: 12%;
+  }
+
+  #invoice-print .invoice-col-qty {
+    width: 8%;
+  }
+
+  #invoice-print .invoice-col-total {
+    width: 20%;
+  }
+
+  #invoice-print .invoice-col-outstanding {
+    width: 20%;
   }
 }

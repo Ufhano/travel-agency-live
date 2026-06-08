@@ -2,8 +2,8 @@ import type {PaymentWithContext} from '@backend/types';
 import {Dancing_Script} from 'next/font/google';
 import Image from 'next/image';
 import {Mail, MapPin, Phone} from 'lucide-react';
-import {InvoiceDepartureDateCell} from '@/components/invoice-departure-date-cell';
-import {formatDateLong, formatZARInvoice} from '@/lib/utils';
+import {InvoiceTodayDate} from '@/components/invoice-today-date';
+import {formatZARInvoice, hasRealClientEmail} from '@/lib/utils';
 
 const tagline = Dancing_Script({
   subsets: ['latin'],
@@ -66,14 +66,23 @@ function packageColumnHeader(ctx: PaymentWithContext): string {
   return /\bpackage\b/i.test(base) ? base : `${base} Package`;
 }
 
+function clientContactLine(ctx: PaymentWithContext): string | null {
+  if (!hasRealClientEmail(ctx.client.email)) return null;
+  const email = ctx.client.email.trim();
+  const phone = ctx.client.phone?.trim();
+  const showPhone = phone && phone !== '—';
+  return showPhone ? `${phone} · ${email}` : email;
+}
+
 export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
   const desc = packageDescription(ctx);
   const packageHeader = packageColumnHeader(ctx);
+  const contactLine = clientContactLine(ctx);
 
   return (
     <div
       id='invoice-print'
-      className='relative mx-auto max-w-4xl overflow-hidden border border-black/10 bg-white text-[13px] leading-normal text-slate-900 shadow-sm print:mx-0 print:max-w-none print:border-0 print:shadow-none'
+      className='invoice-print relative mx-auto max-w-4xl overflow-hidden border border-black/10 bg-white text-[13px] leading-normal text-slate-900 shadow-sm print:mx-0 print:max-w-none print:border-0 print:shadow-none'
       style={{color: '#0f172a'}}
     >
       {/* Decorative shapes — top left */}
@@ -198,58 +207,64 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
               </span>
               {ctx.client.fullName}
             </p>
-            <p>
-              <span className='font-semibold' style={{color: TEAL_DEEP}}>
-                Contacts:{' '}
-              </span>
-              {[ctx.client.phone, ctx.client.email].filter(Boolean).join(' · ')}
-            </p>
+            {contactLine ? (
+              <p>
+                <span className='font-semibold' style={{color: TEAL_DEEP}}>
+                  Contacts:{' '}
+                </span>
+                {contactLine}
+              </p>
+            ) : null}
           </div>
         </div>
 
         {/* Line items table */}
         <div className='mt-8 overflow-x-auto print:overflow-visible'>
-          <table className='w-full table-fixed border border-black text-left text-[13px]'>
+          <table className='invoice-table w-full border border-black text-left'>
             <thead>
               <tr className='border-b border-black bg-slate-50'>
-                <th className='border-r border-black px-2 py-2 font-bold sm:px-3'>
+                <th className='invoice-col-package border-r border-black px-2 py-2 font-bold sm:px-3'>
                   {packageHeader}
                 </th>
-                <th className='w-[11%] border-r border-black px-2 py-2 font-bold sm:px-3'>
+                <th className='invoice-col-date border-r border-black px-2 py-2 font-bold sm:px-3'>
                   Date
                 </th>
-                <th className='w-[13%] border-r border-black px-2 py-2 font-bold sm:px-3'>
-                  Amount paid
+                <th className='invoice-col-paid border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  <span className='block leading-tight'>Amount</span>
+                  <span className='block leading-tight'>paid</span>
                 </th>
-                <th className='w-[9%] border-r border-black px-2 py-2 font-bold sm:px-3'>
-                  No of Clients
+                <th className='invoice-col-qty border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  <span className='block leading-tight'>No of</span>
+                  <span className='block leading-tight'>Clients</span>
                 </th>
-                <th className='w-[14%] border-r border-black px-2 py-2 font-bold sm:px-3'>
-                  Total amount to be paid
+                <th className='invoice-col-total border-r border-black px-2 py-2 font-bold sm:px-3'>
+                  <span className='block leading-tight'>Total amount</span>
+                  <span className='block leading-tight'>to be paid</span>
                 </th>
-                <th className='w-[13%] px-2 py-2 font-bold sm:px-3'>
-                  Outstanding amount
+                <th className='invoice-col-outstanding px-2 py-2 font-bold sm:px-3'>
+                  <span className='block leading-tight'>Outstanding</span>
+                  <span className='block leading-tight'>amount</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className='align-top'>
-                <td className='border-r border-t border-black px-2 py-3 sm:px-3'>
+                <td className='invoice-col-package border-r border-t border-black px-2 py-3 sm:px-3 break-words'>
                   {desc}
                 </td>
-                <td className='border-r border-t border-black px-2 py-3 sm:px-3 align-bottom'>
-                  <InvoiceDepartureDateCell />
+                <td className='invoice-col-date border-r border-t border-black px-2 py-3 sm:px-3 text-[11px] leading-snug tabular-nums'>
+                  <InvoiceTodayDate compact className='block' />
                 </td>
-                <td className='border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                <td className='invoice-col-paid border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
                   {formatZARInvoice(ctx.amount)}
                 </td>
-                <td className='border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                <td className='invoice-col-qty border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums text-center'>
                   1
                 </td>
-                <td className='border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                <td className='invoice-col-total border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
                   {formatZARInvoice(ctx.client.packagePrice)}
                 </td>
-                <td className='border-t border-black px-2 py-3 sm:px-3 tabular-nums'>
+                <td className='invoice-col-outstanding border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
                   {formatZARInvoice(ctx.balanceAfter)}
                 </td>
               </tr>
@@ -289,7 +304,7 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
               Date:
             </span>
             <span className='ml-2 tabular-nums'>
-              {formatDateLong(ctx.paidAt)}
+              <InvoiceTodayDate />
             </span>
           </p>
         </div>

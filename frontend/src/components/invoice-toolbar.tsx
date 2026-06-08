@@ -4,12 +4,27 @@ import Link from "next/link";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+/** Print the on-screen invoice so PDF matches the live layout (styles, logo, fonts). */
+function printInvoice(invoiceNumber: string) {
+  const originalTitle = document.title;
+  document.title = `Invoice ${invoiceNumber}`;
+
+  const restore = () => {
+    document.title = originalTitle;
+    window.removeEventListener("afterprint", restore);
+  };
+  window.addEventListener("afterprint", restore);
+  window.print();
+}
+
 export function InvoiceToolbar({
   clientId,
   tripId,
+  invoiceNumber,
 }: {
   clientId: string;
   tripId: string;
+  invoiceNumber: string;
 }) {
   return (
     <div className="no-print flex flex-wrap items-center justify-between gap-3">
@@ -32,7 +47,7 @@ export function InvoiceToolbar({
           variant="default"
           size="sm"
           className="gap-2"
-          onClick={() => window.print()}
+          onClick={() => printInvoice(invoiceNumber)}
         >
           <Printer className="h-4 w-4" />
           Print
@@ -42,8 +57,7 @@ export function InvoiceToolbar({
           variant="secondary"
           size="sm"
           className="gap-2"
-          title="A live system would generate a PDF file here"
-          onClick={() => window.print()}
+          onClick={() => printInvoice(invoiceNumber)}
         >
           <Download className="h-4 w-4" />
           Save as PDF

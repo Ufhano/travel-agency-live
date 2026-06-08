@@ -40,6 +40,26 @@ export function formatDateLong(iso: string): string {
   }).format(new Date(iso));
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PLACEHOLDER_EMAILS = new Set(["insert@email.com", "n/a", "na", "none", "—"]);
+
+/** True when the client has a real email (not import placeholder). */
+export function hasRealClientEmail(email: string | null | undefined): boolean {
+  const trimmed = email?.trim();
+  if (!trimmed) return false;
+  if (PLACEHOLDER_EMAILS.has(trimmed.toLowerCase())) return false;
+  return EMAIL_RE.test(trimmed);
+}
+
+/** Long-form date for today (e.g. 8 June 2026). */
+export function formatTodayLong(): string {
+  return new Intl.DateTimeFormat("en-ZA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+}
+
 export function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat("en-ZA", {
     year: "numeric",

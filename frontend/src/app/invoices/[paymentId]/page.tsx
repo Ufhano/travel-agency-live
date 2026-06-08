@@ -21,7 +21,11 @@ export default async function InvoiceDetailPage({
   return (
     <div className="space-y-6">
       {dbError ? <DbConnectionBanner message={dbError} /> : null}
-      <InvoiceToolbar clientId={ctx.client.id} tripId={ctx.trip.id} />
+      <InvoiceToolbar
+        clientId={ctx.client.id}
+        tripId={ctx.trip.id}
+        invoiceNumber={ctx.invoiceNumber}
+      />
       <InvoicePrintBody ctx={ctx} />
     </div>
   );
