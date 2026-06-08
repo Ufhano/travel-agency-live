@@ -15,6 +15,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {CreateTripInline} from '@/components/create-trip-inline';
+import {useToast} from '@/components/ui/toast';
+import {
+  destinationFromGroupLabel,
+  matchTripForGroup,
+} from '@/lib/match-trip';
 import {formatDate, formatZAR} from '@/lib/utils';
 
 type ImportKind = 'spreadsheet' | 'pdf' | 'word';
@@ -25,6 +30,12 @@ type ApiOk = {
   count: number;
   rows: ImportExtractResult[];
   warnings: string[];
+  tripSync?: {
+    trips: TripOption[];
+    groupTripIds: Record<string, string>;
+    createdCount: number;
+    createdNames: string[];
+  };
 };
 
 const ACCEPT_BY_KIND: Record<ImportKind, string> = {
@@ -94,6 +105,7 @@ const IMPORT_OPTIONS: readonly {
 
 export default function ImportPage() {
   const router = useRouter();
+  const {toast} = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const tripSelectRef = useRef<HTMLSelectElement>(null);
   const [importKind, setImportKind] = useState<ImportKind | null>(null);
@@ -105,6 +117,8 @@ export default function ImportPage() {
   const [tripsLoading, setTripsLoading] = useState(true);
   const [tripsHint, setTripsHint] = useState<string | null>(null);
   const [selectedTripId, setSelectedTripId] = useState('');
+  const [groupTripIds, setGroupTripIds] = useState<Record<string, string>>({});
+  const [creatingTrips, setCreatingTrips] = useState(false);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(() => new Set());
   const [savingKeys, setSavingKeys] = useState<Set<string>>(() => new Set());
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
@@ -241,6 +255,91 @@ export default function ImportPage() {
       .map(([group, rows]) => ({group, rows}));
   }, [payload]);
 
+  useEffect(() => {
+    if (!payload || trips.length === 0) return;
+    setGroupTripIds((prev) => {
+      const next = {...prev};
+      for (const {group} of groupedByDestination) {
+        if (next[group]) continue;
+        const matched = matchTripForGroup(group, trips);
+        if (matched) next[group] = matched;
+      }
+      return next;
+    });
+  }, [payload, trips, groupedByDestination]);
+
+  const tripIdForGroup = useCallback(
+    (group: string) => {
+      const perGroup = groupTripIds[group]?.trim();
+      if (perGroup) return perGroup;
+      return selectedTripId.trim();
+    },
+    [groupTripIds, selectedTripId],
+  );
+
+  const unmatchedGroups = useMemo(
+    () =>
+      groupedByDestination.filter(
+        ({group}) => !tripIdForGroup(group) && group !== 'Uncategorized',
+      ),
+    [groupedByDestination, tripIdForGroup],
+  );
+
+  const createTripForGroup = useCallback(
+    async (group: string): Promise<TripOption | null> => {
+      const res = await fetch('/api/trips', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          name: group,
+          destination: destinationFromGroupLabel(group),
+          capacity: 40,
+          status: 'Open',
+        }),
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        trip?: TripOption;
+        error?: string;
+      };
+      if (!res.ok || !json.trip) {
+        toast(json.error ?? `Could not create trip for "${group}".`, 'error');
+        return null;
+      }
+      setTrips((prev) => {
+        if (prev.some((t) => t.id === json.trip!.id)) return prev;
+        return [...prev, json.trip!].sort((a, b) =>
+          a.departureDate.localeCompare(b.departureDate),
+        );
+      });
+      setGroupTripIds((prev) => ({...prev, [group]: json.trip!.id}));
+      return json.trip;
+    },
+    [toast],
+  );
+
+  const createAllMissingTrips = useCallback(async () => {
+    if (unmatchedGroups.length === 0) return;
+    setCreatingTrips(true);
+    setSaveBanner(null);
+    try {
+      let created = 0;
+      for (const {group} of unmatchedGroups) {
+        const trip = await createTripForGroup(group);
+        if (trip) created++;
+      }
+      if (created > 0) {
+        toast(`Created ${created} departure(s) from import groups.`, 'success');
+        setSaveBanner(
+          `Created ${created} new departure(s). Each group now has its own trip — save travellers per group below.`,
+        );
+        router.refresh();
+      }
+    } finally {
+      setCreatingTrips(false);
+    }
+  }, [createTripForGroup, router, toast, unmatchedGroups]);
+
   const canSaveToDb = Boolean(selectedTripId.trim()) && trips.length > 0;
   const firstGroupHint = groupedByDestination[0]?.group;
   const createTripDefaultName =
@@ -273,14 +372,31 @@ export default function ImportPage() {
           return;
         }
         if (!res.ok) setError((json as {error: string}).error ?? 'Upload failed.');
-        else setPayload(json as ApiOk);
+        else {
+          const ok = json as ApiOk;
+          setPayload(ok);
+          if (ok.tripSync?.trips?.length) {
+            setTrips(ok.tripSync.trips);
+            setGroupTripIds(ok.tripSync.groupTripIds ?? {});
+            if (ok.tripSync.createdCount > 0) {
+              toast(
+                `Synced ${ok.tripSync.trips.length} departures from your spreadsheet (${ok.tripSync.createdCount} new).`,
+                'success',
+              );
+              setSaveBanner(
+                `Each worksheet tab is now a departure in the database. Pick the trip per group below, then save travellers.`,
+              );
+              router.refresh();
+            }
+          }
+        }
       } catch {
         setError('Could not reach the server.');
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [router, toast],
   );
 
   const onPickKind = (next: ImportKind) => {
@@ -438,8 +554,9 @@ export default function ImportPage() {
                 Save to database
               </CardTitle>
               <CardDescription>
-                Pick or create a departure, then save travellers. Each client is stored in Neon under
-                that trip.
+                Each destination group needs its own departure in the database. Use
+                &ldquo;Create missing departures&rdquo; to add trips from your
+                spreadsheet tabs, then save travellers per group.
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-3'>
@@ -448,7 +565,12 @@ export default function ImportPage() {
                   defaultName={createTripDefaultName}
                   defaultDestination={createTripDefaultName}
                   onCreated={(trip) => {
-                    setTrips([trip]);
+                    setTrips((prev) => {
+                      if (prev.some((t) => t.id === trip.id)) return prev;
+                      return [...prev, trip].sort((a, b) =>
+                        a.departureDate.localeCompare(b.departureDate),
+                      );
+                    });
                     setSelectedTripId(trip.id);
                     setSaveBanner(`Created “${trip.name}”. You can save travellers now.`);
                   }}
@@ -456,7 +578,7 @@ export default function ImportPage() {
               ) : null}
               <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center'>
                 <label htmlFor='import-trip-select' className='text-sm font-medium'>
-                  Trip
+                  Default trip (fallback)
                 </label>
                 <select
                   ref={tripSelectRef}
@@ -477,13 +599,29 @@ export default function ImportPage() {
                     </option>
                   ))}
                 </select>
+                {unmatchedGroups.length > 0 ? (
+                  <Button
+                    type='button'
+                    variant='default'
+                    size='sm'
+                    disabled={creatingTrips || tripsLoading}
+                    onClick={() => void createAllMissingTrips()}
+                  >
+                    {creatingTrips ? (
+                      <>
+                        <Loader2 className='mr-1.5 h-3.5 w-3.5 animate-spin' aria-hidden />
+                        Creating…
+                      </>
+                    ) : (
+                      `Create missing departures (${unmatchedGroups.length})`
+                    )}
+                  </Button>
+                ) : null}
                 <Button
                   type='button'
                   variant='secondary'
                   size='sm'
                   disabled={
-                    !canSaveToDb ||
-                    tripsLoading ||
                     groupedByDestination.every(({rows, group}) =>
                       rows.every((row, idx) =>
                         savedKeys.has(makeRowKey(payload.fileName, group, idx, row)),
@@ -493,26 +631,50 @@ export default function ImportPage() {
                       rows.some((row, idx) =>
                         savingKeys.has(makeRowKey(payload.fileName, group, idx, row)),
                       ),
-                    )
+                    ) ||
+                    tripsLoading
                   }
-                  onClick={() => {
-                    const allRows: ImportExtractResult[] = [];
-                    const allKeys: string[] = [];
+                  onClick={async () => {
                     for (const {group, rows} of groupedByDestination) {
+                      const tripId = tripIdForGroup(group);
+                      if (!tripId) {
+                        setSaveBanner(
+                          `No trip for "${group}". Create missing departures or pick a trip for that group.`,
+                        );
+                        return;
+                      }
+                      const pendingRows: ImportExtractResult[] = [];
+                      const pendingKeys: string[] = [];
                       rows.forEach((row, idx) => {
                         const k = makeRowKey(payload.fileName, group, idx, row);
                         if (!savedKeys.has(k)) {
-                          allRows.push(row);
-                          allKeys.push(k);
+                          pendingRows.push(row);
+                          pendingKeys.push(k);
                         }
                       });
+                      if (pendingRows.length > 0) {
+                        await saveRowsToTrip(tripId, pendingRows, pendingKeys);
+                      }
                     }
-                    void saveRowsToTrip(selectedTripId, allRows, allKeys);
                   }}
                 >
                   Save all not yet saved
                 </Button>
               </div>
+              {unmatchedGroups.length > 0 ? (
+                <p className='text-sm text-amber-800 dark:text-amber-200' role='status'>
+                  {unmatchedGroups.length} group
+                  {unmatchedGroups.length === 1 ? '' : 's'} still need a departure:{' '}
+                  {unmatchedGroups
+                    .slice(0, 4)
+                    .map(({group}) => group)
+                    .join(', ')}
+                  {unmatchedGroups.length > 4
+                    ? ` …and ${unmatchedGroups.length - 4} more`
+                    : ''}
+                  . Click &ldquo;Create missing departures&rdquo; or choose a trip per group below.
+                </p>
+              ) : null}
               {tripsHint ? <p className='text-xs text-amber-800 dark:text-amber-200'>{tripsHint}</p> : null}
               {!canSaveToDb && trips.length > 0 && !tripsLoading ? (
                 <p className='text-sm text-amber-800 dark:text-amber-200' role='status'>
@@ -582,16 +744,52 @@ export default function ImportPage() {
                     <span className='text-xs text-muted-foreground'>
                       {rows.length} {rows.length === 1 ? 'record' : 'records'}
                     </span>
+                    <label className='sr-only' htmlFor={`trip-${group}`}>
+                      Trip for {group}
+                    </label>
+                    <select
+                      id={`trip-${group}`}
+                      className='h-8 max-w-[16rem] rounded-md border border-input bg-background px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                      disabled={tripsLoading || trips.length === 0}
+                      value={tripIdForGroup(group)}
+                      onChange={(e) =>
+                        setGroupTripIds((prev) => ({...prev, [group]: e.target.value}))
+                      }
+                    >
+                      <option value=''>Select trip…</option>
+                      {trips.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                          {t.destination ? ` — ${t.destination}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {!tripIdForGroup(group) && group !== 'Uncategorized' ? (
+                      <Button
+                        type='button'
+                        size='sm'
+                        variant='outline'
+                        className='h-8 text-xs'
+                        disabled={creatingTrips}
+                        onClick={() => void createTripForGroup(group)}
+                      >
+                        Create trip
+                      </Button>
+                    ) : null}
                     <Button
                       type='button'
                       size='sm'
                       variant='outline'
                       className='ml-auto'
                       disabled={
-                        !canSaveToDb || allInGroupSaved || groupSaving || pendingRows.length === 0
+                        !tripIdForGroup(group) ||
+                        tripsLoading ||
+                        allInGroupSaved ||
+                        groupSaving ||
+                        pendingRows.length === 0
                       }
                       onClick={() => {
-                        void saveRowsToTrip(selectedTripId, pendingRows, pendingKeys);
+                        void saveRowsToTrip(tripIdForGroup(group), pendingRows, pendingKeys);
                       }}
                     >
                       {groupSaving ? (
@@ -614,9 +812,9 @@ export default function ImportPage() {
                           rowKey={rowKey}
                           isSaved={savedKeys.has(rowKey)}
                           isSaving={savingKeys.has(rowKey)}
-                          canSave={canSaveToDb}
+                          canSave={Boolean(tripIdForGroup(group))}
                           onSave={() => {
-                            void saveRowsToTrip(selectedTripId, [row], [rowKey]);
+                            void saveRowsToTrip(tripIdForGroup(group), [row], [rowKey]);
                           }}
                         />
                       );

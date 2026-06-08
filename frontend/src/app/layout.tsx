@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import {AppShell} from '@/components/app-shell';
 import {ServiceWorkerRegister} from '@/components/sw-register';
+import {ToastProvider} from '@/components/ui/toast';
 import {isAuthEnabled} from '@/lib/auth-config';
 import {getSession} from '@/lib/auth-server';
 import {toClientSession} from '@/lib/session-token';
@@ -49,9 +50,11 @@ export default async function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans`}>
         <ServiceWorkerRegister />
-        <AppShell authEnabled={isAuthEnabled()} session={clientSession}>
-          {children}
-        </AppShell>
+        <ToastProvider>
+          <AppShell authEnabled={isAuthEnabled()} session={clientSession}>
+            {children}
+          </AppShell>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Split } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -75,7 +77,15 @@ export default async function ClientsPage() {
             invoice trail. Delete one traveller or an entire destination group.
           </p>
         </div>
-        <AddClientDialog trips={tripOptions} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" asChild>
+            <Link href="/payments/allocate">
+              <Split className="h-4 w-4" />
+              multi-trip
+            </Link>
+          </Button>
+          <AddClientDialog trips={tripOptions} />
+        </div>
       </div>
 
       {destinationGroups.length === 0 ? (
