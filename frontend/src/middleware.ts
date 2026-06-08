@@ -3,7 +3,13 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, isAuthEnabled } from "@/lib/auth-config";
 import { verifySessionToken } from "@/lib/auth-edge";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/manifest.json",
+  "/sw.js",
+];
 
 export async function middleware(request: NextRequest) {
   if (!isAuthEnabled()) {
