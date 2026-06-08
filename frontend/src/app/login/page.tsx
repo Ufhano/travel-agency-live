@@ -9,8 +9,6 @@ const caveat = Caveat({
 });
 
 export default function LoginPage() {
-  const adminUsername = (process.env.ADMIN_USERNAME?.trim() || "admin").toLowerCase();
-
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef1f2] px-4 py-12">
       <div
@@ -51,15 +49,9 @@ export default function LoginPage() {
           <p className="mt-1 text-center text-sm text-teal-800/60">
             Sign in to your workspace. Admin accounts can create users in Settings.
           </p>
-          <p className="mt-3 rounded-lg bg-teal-50/90 px-3 py-2 text-center text-xs text-teal-900/70">
-            Admin username: <strong>{adminUsername}</strong> — password is{" "}
-            <code className="rounded bg-white/80 px-1">ADMIN_PASSWORD</code> in{" "}
-            <code className="rounded bg-white/80 px-1">.env.local</code> (default{" "}
-            <strong>admin</strong>)
-          </p>
           <div className="mt-6">
             <Suspense fallback={<div className="h-40 animate-pulse rounded-lg bg-teal-50" />}>
-              <LoginForm defaultUsername={adminUsername} />
+              <LoginForm defaultUsername="" />
             </Suspense>
           </div>
         </div>
