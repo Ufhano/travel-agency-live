@@ -82,7 +82,7 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
   return (
     <div
       id='invoice-print'
-      className='invoice-print relative mx-auto max-w-4xl overflow-hidden border border-black/10 bg-white text-[13px] leading-normal text-slate-900 shadow-sm print:mx-0 print:max-w-none print:border-0 print:shadow-none'
+      className='invoice-print relative mx-auto max-w-4xl overflow-visible border border-black/10 bg-white text-[13px] leading-normal text-slate-900 shadow-sm print:mx-0 print:max-w-none print:border-0 print:shadow-none'
       style={{color: '#0f172a'}}
     >
       {/* Decorative shapes — top left */}
