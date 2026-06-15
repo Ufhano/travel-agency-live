@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import Link from "next/link";
 import { ArrowRight, Banknote, Calendar, PiggyBank, Wallet } from "lucide-react";
 import { DashboardPaymentHero } from "@/components/dashboard-payment-hero";
-import { KeyOperationalInsights } from "@/components/key-operational-insights";
+// import { KeyOperationalInsights } from "@/components/key-operational-insights";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -25,12 +25,12 @@ export default async function DashboardPage() {
   const { data, dbError, session } = await loadAppDataForPage();
   const {
     aggregateTrip,
-    buildKeyOperationalInsights,
+    // buildKeyOperationalInsights,
     dashboardSummary,
     displayTripStatus,
   } = createCompute(data);
   const summary = dashboardSummary();
-  const keyInsights = buildKeyOperationalInsights();
+  // const keyInsights = buildKeyOperationalInsights();
   const departuresWithClients = summary.tripAggregates.filter(
     (agg) => agg.confirmedCount > 0,
   );
@@ -87,7 +87,7 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <KeyOperationalInsights insights={keyInsights} />
+      {/* <KeyOperationalInsights insights={keyInsights} /> */}
 
       <div id="departures" className="space-y-4">
         <h2 className="text-lg font-semibold">Departures at a glance</h2>

@@ -3,7 +3,7 @@ import {Dancing_Script} from 'next/font/google';
 import Image from 'next/image';
 import {Mail, MapPin, Phone} from 'lucide-react';
 import {InvoiceTodayDate} from '@/components/invoice-today-date';
-import {formatZARInvoice, hasRealClientEmail} from '@/lib/utils';
+import {formatDate, formatZARInvoice, hasRealClientEmail} from '@/lib/utils';
 
 const tagline = Dancing_Script({
   subsets: ['latin'],
@@ -274,7 +274,7 @@ export function InvoicePrintBody({
                   {desc}
                 </td>
                 <td className='invoice-col-date border-r border-t border-black px-2 py-3 sm:px-3 text-[11px] leading-snug tabular-nums'>
-                  <InvoiceTodayDate compact className='block' />
+                  {formatDate(ctx.paidAt)}
                 </td>
                 <td className='invoice-col-paid border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
                   {formatZARInvoice(paid)}
