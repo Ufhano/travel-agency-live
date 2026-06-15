@@ -74,10 +74,31 @@ function clientContactLine(ctx: PaymentWithContext): string | null {
   return showPhone ? `${phone} · ${email}` : email;
 }
 
-export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
+export function InvoicePrintBody({
+  ctx,
+  variant = 'payment',
+}: {
+  ctx: PaymentWithContext;
+  /** `payment` = single receipt. `partial` / `full` = client statement. */
+  variant?: 'payment' | 'partial' | 'full';
+}) {
   const desc = packageDescription(ctx);
   const packageHeader = packageColumnHeader(ctx);
   const contactLine = clientContactLine(ctx);
+  const paid =
+    variant === 'full'
+      ? ctx.client.packagePrice
+      : variant === 'partial'
+        ? ctx.totalPaidAfter
+        : ctx.amount;
+  const balance =
+    variant === 'full' ? 0 : ctx.balanceAfter;
+  const ribbonLabel =
+    variant === 'full'
+      ? 'INVOICE — PAID IN FULL'
+      : variant === 'partial'
+        ? 'INVOICE — PARTIAL PAYMENT'
+        : 'INVOICE';
 
   return (
     <div
@@ -143,10 +164,10 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
 
           <div className='flex flex-col items-stretch gap-4 lg:items-end'>
             <div
-              className='print-color-exact self-end px-10 py-3 text-center text-xl font-bold tracking-[0.2em] text-white'
+              className='print-color-exact self-end px-6 py-3 text-center text-base font-bold tracking-[0.12em] text-white sm:px-10 sm:text-xl sm:tracking-[0.2em]'
               style={{backgroundColor: TEAL_DEEP}}
             >
-              INVOICE
+              {ribbonLabel}
             </div>
 
             <div
@@ -256,7 +277,7 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
                   <InvoiceTodayDate compact className='block' />
                 </td>
                 <td className='invoice-col-paid border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
-                  {formatZARInvoice(ctx.amount)}
+                  {formatZARInvoice(paid)}
                 </td>
                 <td className='invoice-col-qty border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums text-center'>
                   1
@@ -265,7 +286,7 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
                   {formatZARInvoice(ctx.client.packagePrice)}
                 </td>
                 <td className='invoice-col-outstanding border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
-                  {formatZARInvoice(ctx.balanceAfter)}
+                  {formatZARInvoice(balance)}
                 </td>
               </tr>
             </tbody>
@@ -293,12 +314,20 @@ export function InvoicePrintBody({ctx}: {ctx: PaymentWithContext}) {
         </section>
 
         <div className='mt-10 flex flex-wrap items-end gap-x-10 gap-y-4 border-t border-slate-200 pt-6 text-sm print:border-black/20'>
-          <p className='min-w-[12rem] flex-1'>
-            <span className='font-semibold' style={{color: TEAL_DEEP}}>
+          <div className='min-w-[12rem] flex-1'>
+            <p className='font-semibold' style={{color: TEAL_DEEP}}>
               Signature:
-            </span>
-            <span className='ml-2 inline-block min-w-[10rem] border-b border-black align-bottom' />
-          </p>
+            </p>
+            <div className='relative mt-1 h-14 w-48 max-w-full sm:h-16 sm:w-56'>
+              <Image
+                src='/nendila-signature.png'
+                alt='Authorised signature'
+                fill
+                className='object-contain object-left'
+                sizes='224px'
+              />
+            </div>
+          </div>
           <p>
             <span className='font-semibold' style={{color: TEAL_DEEP}}>
               Date:

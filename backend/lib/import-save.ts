@@ -38,6 +38,12 @@ function paidAtIso(row: ImportExtractResult): string {
   return new Date().toISOString();
 }
 
+function instalmentPaidAtIso(paidAt: string): string {
+  const d = new Date(`${paidAt.slice(0, 10)}T12:00:00.000Z`);
+  if (!Number.isNaN(d.valueOf())) return d.toISOString();
+  return new Date().toISOString();
+}
+
 /**
  * Inserts one client (+ optional payment) for an existing trip. Caller must verify `tripId` exists.
  */
@@ -82,6 +88,48 @@ export async function saveImportExtractToNeon(
       ${balanceDue}
     )
   `;
+
+  const installments =
+    row.payment.installments?.filter((i) => i.amount > 0) ?? [];
+
+  if (installments.length > 0) {
+    let firstPaymentId: string | undefined;
+    let paymentError: string | undefined;
+    for (let i = 0; i < installments.length; i++) {
+      const inst = installments[i]!;
+      const paymentId = id('p');
+      const inv = `IMP-${Date.now()}-${randomBytes(3).toString('hex')}-${i + 1}`.slice(
+        0,
+        120,
+      );
+      try {
+        await sql`
+          INSERT INTO payments (id, tenant_id, invoice_number, client_id, trip_id, amount, paid_at, method, note)
+          VALUES (
+            ${paymentId},
+            ${tenantId},
+            ${inv},
+            ${clientId},
+            ${tripId},
+            ${Math.round(inst.amount)},
+            ${instalmentPaidAtIso(inst.paidAt)},
+            ${'Instalment'},
+            ${`${inst.label} instalment`}
+          )
+        `;
+        if (!firstPaymentId) firstPaymentId = paymentId;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        paymentError = `Traveller saved; some instalments skipped: ${msg}`;
+      }
+    }
+    return {
+      ok: true,
+      clientId,
+      paymentId: firstPaymentId,
+      paymentError,
+    };
+  }
 
   const amt = row.payment.amount;
   if (amt != null && amt > 0) {

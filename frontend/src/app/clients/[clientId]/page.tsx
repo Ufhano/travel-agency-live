@@ -12,10 +12,15 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ClientDetailToolbar } from "@/components/client-detail-toolbar";
+import { ClientInvoicePicker } from "@/components/client-invoice-picker";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
+import {
+  collectClientMonthlyInstallments,
+  paymentMonthLabel,
+} from "@backend/payment-schedule";
 import { loadAppDataForPage } from "@/lib/page-data";
-import { formatDateTime, formatZAR } from "@/lib/utils";
+import { formatDate, formatDateTime, formatZAR } from "@/lib/utils";
 
 export default async function ClientPage({
   params,
@@ -38,6 +43,8 @@ export default async function ClientPage({
   const paid = totalPaidForClient(client.id);
   const balance = balanceForClient(client);
   const history = paymentsForClient(client.id);
+  const monthlyInstallments = collectClientMonthlyInstallments(history);
+  const instalmentsTotal = monthlyInstallments.reduce((s, i) => s + i.amount, 0);
 
   return (
     <div className="space-y-8">
@@ -95,6 +102,66 @@ export default async function ClientPage({
         </Card>
       </div>
 
+      <ClientInvoicePicker
+        clientId={client.id}
+        clientName={client.fullName}
+        packagePrice={client.packagePrice}
+        totalPaid={paid}
+        balance={balance}
+      />
+
+      {monthlyInstallments.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">When they paid (by month)</CardTitle>
+            <CardDescription>
+              Each row is an instalment month from the group payment tracker.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 sm:px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Month</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {monthlyInstallments.map((inst) => (
+                  <TableRow key={`${inst.month}-${inst.amount}-${inst.paidAt ?? ""}`}>
+                    <TableCell className="font-medium">{inst.month}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+                      {inst.paidAt ? formatDate(inst.paidAt) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatZAR(inst.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/40 font-medium">
+                  <TableCell colSpan={2}>Total instalments</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatZAR(instalmentsTotal)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : history.length > 0 ? (
+        <Card className="border-amber-200 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Monthly payments not on file</CardTitle>
+            <CardDescription>
+              This traveller was saved before the monthly breakdown was recorded.
+              Re-import the spreadsheet on the Import page and save this group again
+              to see which months they paid and how much.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Receipts & payments</CardTitle>
@@ -107,9 +174,10 @@ export default async function ClientPage({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Month</TableHead>
                 <TableHead>Invoice</TableHead>
-                <TableHead className="hidden sm:table-cell">Date</TableHead>
-                <TableHead className="text-right">This payment</TableHead>
+                <TableHead className="hidden sm:table-cell">Date recorded</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="hidden md:table-cell text-right">
                   Paid after
                 </TableHead>
@@ -122,8 +190,12 @@ export default async function ClientPage({
             <TableBody>
               {history.map((p) => {
                 const ctx = enrichPayment(p)!;
+                const month = paymentMonthLabel(p);
                 return (
                   <TableRow key={p.id}>
+                    <TableCell className="font-medium whitespace-nowrap">
+                      {month ?? "—"}
+                    </TableCell>
                     <TableCell className="font-mono text-xs font-medium">
                       {p.invoiceNumber}
                       <div className="font-sans text-[11px] text-muted-foreground sm:hidden">

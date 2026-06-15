@@ -162,6 +162,15 @@ def extract_sheet(ws: Worksheet, sheet_name: str) -> dict[str, Any]:
     }
 
 
+def is_ignored_sheet(name: str) -> bool:
+    n = name.strip().lower()
+    if not n:
+        return False
+    if n == "msc cruises 2026 admin":
+        return True
+    return bool(re.search(r"\sadmin\s*$", n))
+
+
 def main() -> None:
     logs: list[str] = []
     if len(sys.argv) < 2:
@@ -195,6 +204,9 @@ def main() -> None:
 
     try:
         for name in wb.sheetnames:
+            if is_ignored_sheet(name):
+                logs.append(f'Sheet "{name}": skipped (admin tab)')
+                continue
             ws = wb[name]
             try:
                 block = extract_sheet(ws, name)

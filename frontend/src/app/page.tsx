@@ -31,6 +31,9 @@ export default async function DashboardPage() {
   } = createCompute(data);
   const summary = dashboardSummary();
   const keyInsights = buildKeyOperationalInsights();
+  const departuresWithClients = summary.tripAggregates.filter(
+    (agg) => agg.confirmedCount > 0,
+  );
 
   return (
     <div className="space-y-8">
@@ -51,7 +54,7 @@ export default async function DashboardPage() {
         paid={summary.totalCollected}
         total={summary.totalAmountToBePaid}
         outstanding={summary.totalOutstanding}
-        tripCount={summary.totalTrips}
+        tripCount={departuresWithClients.length}
         asOfDay={asOfDay}
         displayName={session.displayName}
       />
@@ -59,9 +62,9 @@ export default async function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Departures"
-          value={String(summary.totalTrips)}
+          value={String(departuresWithClients.length)}
           icon={Calendar}
-          hint="Trips on file"
+          hint="Trips with saved travellers"
         />
         <MetricCard
           title="Total amount to be paid"
@@ -116,7 +119,18 @@ export default async function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {summary.tripAggregates.map((agg) => {
+                  {departuresWithClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
+                        No departures with saved travellers yet. Import a
+                        spreadsheet or add clients to a trip to see them here.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    departuresWithClients.map((agg) => {
                     const status = displayTripStatus(agg.trip, agg);
                     return (
                       <TableRow key={agg.trip.id}>
@@ -148,15 +162,17 @@ export default async function DashboardPage() {
                         </TableCell>
                       </TableRow>
                     );
-                  })}
+                  })
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
       </div>
 
+      {departuresWithClients.length > 0 ? (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {summary.tripAggregates.map((agg) => (
+        {departuresWithClients.map((agg) => (
           <Card key={agg.trip.id} className="overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
@@ -201,6 +217,7 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+      ) : null}
     </div>
   );
 }

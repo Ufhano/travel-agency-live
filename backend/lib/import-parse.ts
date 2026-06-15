@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 
 import { isXlsxBuffer, runPythonExcelExtract } from './ingestion/parse-excel-python';
+import type { PaymentInstallment } from './payment-schedule';
 
 /** One logical record from a row or PDF heuristic pass. */
 export type ImportExtractResult = {
@@ -20,6 +21,8 @@ export type ImportExtractResult = {
     paidAt: string | null;
     method: string | null;
     note: string | null;
+    /** Per-month amounts from group payment tracker columns. */
+    installments?: PaymentInstallment[];
   };
   sourceRow?: number;
   /** Excel worksheet tab name when present — often encodes destination / product line. */
@@ -45,6 +48,14 @@ export type SpreadsheetImportResult = {
   columnMeta?: ImportSpreadsheetMeta;
 };
 
+/** Internal workbook tabs (cabin/passport admin) — not traveller payment groups. */
+export function isImportIgnoredWorksheet(sheetName: string): boolean {
+  const n = sheetName.trim().toLowerCase();
+  if (!n) return false;
+  if (n === 'msc cruises 2026 admin') return true;
+  return /\sadmin\s*$/.test(n);
+}
+
 const HEADER_ALIASES: Record<string, keyof NormalizedCols> = {
   fullname: 'fullName',
   name: 'fullName',
@@ -68,6 +79,7 @@ const HEADER_ALIASES: Record<string, keyof NormalizedCols> = {
   names: 'fullName',
 
   surname: '_lastName',
+  surnames: '_lastName',
   lastname: '_lastName',
   'last name': '_lastName',
   familyname: '_lastName',
@@ -892,6 +904,54 @@ function spreadsheetRowToResult(
   };
 }
 
+const LEDGER_MONTH_INDEX: Record<string, number> = {
+  january: 1,
+  jan: 1,
+  february: 2,
+  feb: 2,
+  march: 3,
+  mar: 3,
+  april: 4,
+  apr: 4,
+  may: 5,
+  june: 6,
+  jun: 6,
+  july: 7,
+  jul: 7,
+  august: 8,
+  aug: 8,
+  september: 9,
+  sep: 9,
+  sept: 9,
+  october: 10,
+  oct: 10,
+  november: 11,
+  nov: 11,
+  december: 12,
+  dec: 12,
+};
+
+const LEDGER_MONTH_ABBR = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function ledgerMonthLabel(month: number, year: number): string {
+  const abbr = LEDGER_MONTH_ABBR[month - 1] ?? 'Mon';
+  const yy = year >= 2000 ? String(year).slice(-2) : String(year);
+  return `${abbr}-${yy}`;
+}
+
 /** e.g. "Aug-25", "Sept-25", "Jan-26" → yyyy-mm-01 (normHeader turns "-" into space) */
 function parsePaymentLedgerMonth(cell: unknown): {
   yyyyMmDd: string;
@@ -906,34 +966,7 @@ function parsePaymentLedgerMonth(cell: unknown): {
   const monToken = m[1];
   const yrStr = m[2];
 
-  const monthIndex: Record<string, number> = {
-    january: 1,
-    jan: 1,
-    february: 2,
-    feb: 2,
-    march: 3,
-    mar: 3,
-    april: 4,
-    apr: 4,
-    may: 5,
-    june: 6,
-    jun: 6,
-    july: 7,
-    jul: 7,
-    august: 8,
-    aug: 8,
-    september: 9,
-    sep: 9,
-    sept: 9,
-    october: 10,
-    oct: 10,
-    november: 11,
-    nov: 11,
-    december: 12,
-    dec: 12,
-  };
-
-  const mi = monthIndex[monToken] ?? monthIndex[monToken.slice(0, 3)] ?? null;
+  const mi = LEDGER_MONTH_INDEX[monToken] ?? LEDGER_MONTH_INDEX[monToken.slice(0, 3)] ?? null;
   if (!mi) return null;
 
   let yr = Number.parseInt(yrStr, 10);
@@ -943,6 +976,32 @@ function parsePaymentLedgerMonth(cell: unknown): {
 
   const mm = String(mi).padStart(2, '0');
   return {yyyyMmDd: `${yr}-${mm}-01`, label};
+}
+
+/** Month instalment columns stored as Excel serial dates in header row (raw read). */
+function parsePaymentLedgerMonthFromCell(cell: unknown): {
+  yyyyMmDd: string;
+  label: string;
+} | null {
+  let probe: unknown = cell;
+  if (typeof probe === 'string') {
+    const t = probe.trim();
+    if (/^\d{5,6}$/.test(t)) probe = Number(t);
+    else if (t) {
+      const textHit = parsePaymentLedgerMonth(t);
+      if (textHit) return textHit;
+    }
+  }
+
+  if (typeof probe !== 'number' || !Number.isFinite(probe) || probe < 30_000)
+    return null;
+  const parsed = XLSX.SSF.parse_date_code(probe);
+  if (!parsed?.y || !parsed.m) return null;
+  const mm = String(parsed.m).padStart(2, '0');
+  return {
+    yyyyMmDd: `${parsed.y}-${mm}-01`,
+    label: ledgerMonthLabel(parsed.m, parsed.y),
+  };
 }
 
 /** Amount paid on group trackers = Total Package − Outstanding. */
@@ -976,10 +1035,44 @@ function isLedgerTravellerName(fullName: string): boolean {
 type PaymentLedgerHeader = {
   headerIdx: number;
   nameCol: number;
+  /** When "Names" spans surname + first name columns (header blank on second col). */
+  firstNameCol: number;
   outstandingCol: number;
   totalPkgCol: number;
   monthCols: {col: number; paidAt: string; label: string}[];
 };
+
+function ledgerAdjacentFirstNameCol(
+  row: unknown[],
+  nameCol: number,
+  matrix: unknown[][],
+  headerIdx: number,
+): number {
+  const nextHeader = String(row[nameCol + 1] ?? '').trim();
+  if (nextHeader && normHeader(nextHeader) !== 'names') return -1;
+
+  let hits = 0;
+  for (let r = headerIdx + 1; r < Math.min(matrix.length, headerIdx + 12); r++) {
+    const first = String(matrix[r]?.[nameCol + 1] ?? '').trim();
+    if (!first || /^\d+$/.test(first)) continue;
+    if (looksLikePersonName(first) || /^[\p{L}][\p{L}'. -]{1,}$/u.test(first)) hits++;
+  }
+  return hits >= 2 ? nameCol + 1 : -1;
+}
+
+function ledgerTravellerFullName(
+  erow: unknown[] | undefined,
+  nameCol: number,
+  firstNameCol: number,
+): string {
+  const last = String(erow?.[nameCol] ?? '').trim();
+  const first =
+    firstNameCol >= 0 ? String(erow?.[firstNameCol] ?? '').trim() : '';
+  if (first && !/^\d+$/.test(first)) {
+    return [last, first].filter(Boolean).join(' ').trim();
+  }
+  return last;
+}
 
 /** Find header row (titles above, index column before Names is OK). */
 function detectPaymentLedgerHeader(matrix: unknown[][]): PaymentLedgerHeader | null {
@@ -994,18 +1087,22 @@ function detectPaymentLedgerHeader(matrix: unknown[][]): PaymentLedgerHeader | n
     const hits: PaymentLedgerHeader['monthCols'] = [];
 
     for (let c = 0; c < row.length; c++) {
-      const raw = String(row[c] ?? '').trim();
+      const cell = row[c];
+      const raw = String(cell ?? '').trim();
       if (!raw) continue;
       const low = normHeader(raw);
 
       if (
         low === 'names' ||
         low === 'name' ||
+        low === 'surnames' ||
+        low === 'surname' ||
         /^names?$/.test(low) ||
         (low.includes('name') &&
           !low.includes('package') &&
           !low.includes('trip') &&
-          !low.includes('invoice'))
+          !low.includes('invoice') &&
+          !/^id\s/.test(low))
       ) {
         if (nc < 0) nc = c;
       }
@@ -1013,7 +1110,7 @@ function detectPaymentLedgerHeader(matrix: unknown[][]): PaymentLedgerHeader | n
       if (low === 'total package' || /^total\s*package/.test(low)) tp = c;
       if (low === 'outstanding' || /^outstand/.test(low)) oc = c;
 
-      const mo = parsePaymentLedgerMonth(raw);
+      const mo = parsePaymentLedgerMonthFromCell(cell);
       if (mo) hits.push({col: c, paidAt: mo.yyyyMmDd, label: mo.label});
     }
 
@@ -1033,6 +1130,7 @@ function detectPaymentLedgerHeader(matrix: unknown[][]): PaymentLedgerHeader | n
       best = {
         headerIdx: r,
         nameCol: nc,
+        firstNameCol: ledgerAdjacentFirstNameCol(row, nc, matrix, r),
         outstandingCol: oc,
         totalPkgCol: tp,
         monthCols: hits,
@@ -1051,13 +1149,14 @@ function detectPaymentLedgerHeader(matrix: unknown[][]): PaymentLedgerHeader | n
     let tp = -1;
 
     for (let c = 0; c < row.length; c++) {
-      const raw = String(row[c] ?? '').trim();
+      const cell = row[c];
+      const raw = String(cell ?? '').trim();
       if (!raw) continue;
       const low = normHeader(raw);
       if (low === 'names' || (nc < 0 && low === 'name')) nc = c;
       if (low === 'total package' || /^total\s*package/.test(low)) tp = c;
       if (low === 'outstanding' || /^outstand/.test(low)) oc = c;
-      const mo = parsePaymentLedgerMonth(raw);
+      const mo = parsePaymentLedgerMonthFromCell(cell);
       if (mo) hits.push({col: c, paidAt: mo.yyyyMmDd, label: mo.label});
     }
 
@@ -1065,6 +1164,7 @@ function detectPaymentLedgerHeader(matrix: unknown[][]): PaymentLedgerHeader | n
       return {
         headerIdx: r,
         nameCol: nc,
+        firstNameCol: ledgerAdjacentFirstNameCol(row, nc, matrix, r),
         outstandingCol: oc,
         totalPkgCol: tp,
         monthCols: hits,
@@ -1092,7 +1192,8 @@ function tryParsePaymentLedger(
   const detected = detectPaymentLedgerHeader(matrix);
   if (!detected) return [];
 
-  const {headerIdx, nameCol, outstandingCol, totalPkgCol, monthCols} = detected;
+  const {headerIdx, nameCol, firstNameCol, outstandingCol, totalPkgCol, monthCols} =
+    detected;
 
   const titlePieces: string[] = [];
   for (let tr = 0; tr < headerIdx; tr++) {
@@ -1110,7 +1211,7 @@ function tryParsePaymentLedger(
 
   for (let r = headerIdx + 1; r < matrix.length; r++) {
     const erow = matrix[r];
-    const fullName = String(erow?.[nameCol] ?? '').trim();
+    const fullName = ledgerTravellerFullName(erow, nameCol, firstNameCol);
     if (!fullName.length || fullName.length > 72) continue;
     if (/^(total|grand|sum|sub)\b/i.test(fullName)) continue;
     if (!isLedgerTravellerName(fullName)) continue;
@@ -1130,10 +1231,16 @@ function tryParsePaymentLedger(
 
     let lastPaidAt: string | null = null;
     const scheduleParts: string[] = [];
+    const installments: PaymentInstallment[] = [];
     for (const mc of monthCols) {
       const instalment = coerceMoney(erow?.[mc.col]);
       if (instalment == null || instalment <= 0) continue;
       scheduleParts.push(`${mc.label}: R${instalment.toFixed(0)}`);
+      installments.push({
+        label: mc.label,
+        amount: instalment,
+        paidAt: mc.paidAt,
+      });
       if (!lastPaidAt || mc.paidAt > lastPaidAt) lastPaidAt = mc.paidAt;
     }
 
@@ -1163,6 +1270,7 @@ function tryParsePaymentLedger(
         paidAt: lastPaidAt,
         method: null,
         note: notes.length > 0 ? notes.slice(0, 500) : null,
+        installments: installments.length > 0 ? installments : undefined,
       },
       sourceRow: r + 1,
       sourceSheet: sheetName ?? null,
@@ -1172,40 +1280,6 @@ function tryParsePaymentLedger(
   }
 
   return travellers.length > 0 ? travellers : [];
-}
-
-/** Names + month columns layout (group payment tracker) from workbook buffer. */
-function parsePaymentLedgersFromWorkbook(buffer: Buffer): SpreadsheetImportResult {
-  const clean = stripBomBuffer(buffer);
-  let wb: XLSX.WorkBook;
-  try {
-    wb = XLSX.read(clean, {type: 'buffer', raw: true});
-  } catch {
-    return {rows: []};
-  }
-  const out: ImportExtractResult[] = [];
-  for (const name of wb.SheetNames) {
-    const sheet = wb.Sheets[name];
-    if (!sheet) continue;
-    const ledger = tryParsePaymentLedger(sheet, name);
-    if (ledger.length > 0) out.push(...ledger);
-  }
-  if (out.length === 0) return {rows: []};
-  return {
-    rows: out,
-    columnMeta: {
-      sheets: wb.SheetNames.map((name) => ({
-        name,
-        headerRow: null,
-        columnHeaders: ['Names', 'Outstanding', 'Total Package'],
-        columnMapping: {
-          Names: 'fullName',
-          Outstanding: '_outstandingAmount',
-          'Total Package': 'packagePrice',
-        },
-      })),
-    },
-  };
 }
 
 function stripBomBuffer(buf: Buffer): Buffer {
@@ -1240,8 +1314,17 @@ export function recordsToImportExtractResults(
   rows: Record<string, unknown>[],
   sheetBlocks?: {name: string; headerRow?: number | null; columnHeaders?: string[]}[],
 ): {rows: ImportExtractResult[]; columnMeta: ImportSpreadsheetMeta} {
+  const importRows = rows.filter((row) => {
+    const sh = row._sheet;
+    const sheet = typeof sh === 'string' ? sh.trim() : '';
+    return !sheet || !isImportIgnoredWorksheet(sheet);
+  });
+  const sheetBlocksFiltered = sheetBlocks?.filter(
+    (b) => !isImportIgnoredWorksheet(b.name),
+  );
+
   const bySheet = new Map<string, Record<string, unknown>[]>();
-  for (const row of rows) {
+  for (const row of importRows) {
     const sh = row._sheet;
     const sheet = typeof sh === 'string' && sh.trim() ? sh.trim() : '';
     const key = sheet || '__default__';
@@ -1254,7 +1337,7 @@ export function recordsToImportExtractResults(
 
   for (const [sheetKey, sheetRows] of bySheet) {
     const sheetName = sheetKey === '__default__' ? '' : sheetKey;
-    const block = sheetBlocks?.find((b) => b.name === sheetName);
+    const block = sheetBlocksFiltered?.find((b) => b.name === sheetName);
     const mapping = buildColumnMappingForSheet(
       sheetName,
       sheetRows,
@@ -1288,7 +1371,7 @@ export function recordsToImportExtractResults(
   }
 
   const results: ImportExtractResult[] = [];
-  rows.forEach((row, i) => {
+  importRows.forEach((row, i) => {
     const sh = row._sheet;
     const sheetKey =
       typeof sh === 'string' && sh.trim() ? sh.trim() : '__default__';
@@ -1422,6 +1505,7 @@ export function parseSpreadsheetImport(buffer: Buffer): SpreadsheetImportResult 
   const out: ImportExtractResult[] = [];
   const sheetsMeta: ImportSheetMeta[] = [];
   for (const name of wb.SheetNames) {
+    if (isImportIgnoredWorksheet(name)) continue;
     const sheet = wb.Sheets[name];
     if (!sheet) continue;
     const ledger = tryParsePaymentLedger(sheet, name);
@@ -1439,14 +1523,14 @@ export function parseSpreadsheetImport(buffer: Buffer): SpreadsheetImportResult 
   };
 }
 
-/** Prefer Python + openpyxl for .xlsx (all sheets, header sniff); else Node path. */
+/** Prefer Python + openpyxl for .xlsx when Node finds nothing; else per-sheet Node path. */
 export async function parseSpreadsheetImportAsync(
   buffer: Buffer,
 ): Promise<SpreadsheetImportResult> {
   const clean = stripBomBuffer(buffer);
 
-  const ledgerFirst = parsePaymentLedgersFromWorkbook(clean);
-  if (ledgerFirst.rows.length > 0) return ledgerFirst;
+  const nodeResult = parseSpreadsheetImport(clean);
+  if (nodeResult.rows.length > 0) return nodeResult;
 
   if (isXlsxBuffer(clean)) {
     const py = await runPythonExcelExtract(clean);
@@ -1460,7 +1544,7 @@ export async function parseSpreadsheetImportAsync(
       if (fromPy.rows.length > 0) return fromPy;
     }
   }
-  return parseSpreadsheetImport(clean);
+  return nodeResult;
 }
 
 /* --- Unstructured (Word / PDF): keyword scan over full text --- */
