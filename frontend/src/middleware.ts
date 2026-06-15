@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isSuperuser } from "@backend/roles";
 import { SESSION_COOKIE, isAuthEnabled } from "@/lib/auth-config";
 import { verifySessionToken } from "@/lib/auth-edge";
 
@@ -29,7 +30,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session) {
-    if (pathname.startsWith("/settings") && session.role !== "admin") {
+    const superuser = isSuperuser(session.role);
+    if (
+      (pathname.startsWith("/settings") || pathname.startsWith("/import")) &&
+      !superuser
+    ) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     return NextResponse.next();

@@ -5,6 +5,7 @@ import { getAuthSecretForNode } from "@/lib/auth-secret-node";
 export { SESSION_COOKIE, isAuthEnabled } from "@/lib/auth-config";
 
 export type { SessionPayload, UserRole } from "@/lib/session-token";
+export { isSuperuser, normalizeRole, roleLabel } from "@backend/roles";
 
 export async function createSessionToken(
   payload: Omit<import("@/lib/session-token").SessionPayload, "exp">,

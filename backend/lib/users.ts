@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { bootstrapAdminUser, ensureAuthSchema } from "./auth-schema";
 import { hashPassword, verifyPassword } from "./password";
+import { normalizeRole, type UserRole } from "./roles";
 
 type SqlExecutor = (
   strings: TemplateStringsArray,
@@ -13,7 +14,7 @@ export type AppUser = {
   tenantId: string;
   username: string;
   displayName: string;
-  role: "admin" | "user";
+  role: UserRole;
   tenantName: string;
   createdAt: string;
 };
@@ -66,7 +67,7 @@ export async function authenticateUser(
     tenantId: row.tenant_id,
     username: row.username,
     displayName: row.display_name,
-    role: row.role === "admin" ? "admin" : "user",
+    role: normalizeRole(row.role),
     tenantName: row.tenant_name,
     createdAt:
       row.created_at instanceof Date
@@ -97,13 +98,47 @@ export async function listUsers(sql: SqlExecutor): Promise<AppUser[]> {
     tenantId: row.tenant_id,
     username: row.username,
     displayName: row.display_name,
-    role: row.role === "admin" ? "admin" : "user",
+    role: normalizeRole(row.role),
     tenantName: row.tenant_name,
     createdAt:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
         : String(row.created_at),
   }));
+}
+
+export async function updateUserRole(
+  sql: SqlExecutor,
+  userId: string,
+  role: UserRole,
+  actingUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (userId === actingUserId) {
+    return { ok: false, error: "You cannot change your own role." };
+  }
+
+  const nextRole = normalizeRole(role);
+
+  const rows = (await sql`
+    SELECT id, role FROM app_users WHERE id = ${userId} LIMIT 1
+  `) as { id: string; role: string }[];
+  const row = rows[0];
+  if (!row) return { ok: false, error: "User not found." };
+
+  const currentRole = normalizeRole(row.role);
+  if (currentRole === nextRole) return { ok: true };
+
+  if (currentRole === "admin" && nextRole === "user") {
+    const counts = (await sql`
+      SELECT COUNT(*)::int AS c FROM app_users WHERE role = 'admin'
+    `) as { c: number }[];
+    if ((counts[0]?.c ?? 0) <= 1) {
+      return { ok: false, error: "At least one superuser must remain." };
+    }
+  }
+
+  await sql`UPDATE app_users SET role = ${nextRole} WHERE id = ${userId}`;
+  return { ok: true };
 }
 
 export async function createWorkspaceUser(
@@ -113,6 +148,7 @@ export async function createWorkspaceUser(
     password: string;
     workspaceName: string;
     displayName?: string;
+    role?: UserRole;
   },
 ): Promise<{ ok: true; user: AppUser } | { ok: false; error: string }> {
   await ensureAuthReady(sql);
@@ -121,6 +157,7 @@ export async function createWorkspaceUser(
   const password = input.password;
   const workspaceName = input.workspaceName.trim();
   const displayName = input.displayName?.trim() || workspaceName;
+  const role = normalizeRole(input.role ?? "user");
 
   if (!username || username.length < 2) {
     return { ok: false, error: "Username must be at least 2 characters." };
@@ -153,7 +190,7 @@ export async function createWorkspaceUser(
   `;
   await sql`
     INSERT INTO app_users (id, tenant_id, username, password_hash, display_name, role)
-    VALUES (${userId}, ${tenantId}, ${username}, ${hashPassword(password)}, ${displayName}, ${"user"})
+    VALUES (${userId}, ${tenantId}, ${username}, ${hashPassword(password)}, ${displayName}, ${role})
   `;
 
   return {
@@ -163,7 +200,7 @@ export async function createWorkspaceUser(
       tenantId,
       username,
       displayName,
-      role: "user",
+      role,
       tenantName: workspaceName,
       createdAt: new Date().toISOString(),
     },
@@ -185,7 +222,7 @@ export async function deleteUserById(
   const row = rows[0];
   if (!row) return { ok: false, error: "User not found." };
   if (row.role === "admin") {
-    return { ok: false, error: "The admin account cannot be deleted." };
+    return { ok: false, error: "Superuser accounts cannot be deleted." };
   }
 
   await sql`DELETE FROM payments WHERE tenant_id = ${row.tenant_id}`;

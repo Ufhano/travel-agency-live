@@ -14,13 +14,18 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isSuperuser } from "@backend/roles";
 import type { ClientSession } from "@/lib/session-token";
 
-const nav = [
+const baseNav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/invoices", label: "Invoices", icon: FileText },
+];
+
+const superuserNav = [
   { href: "/import", label: "Import", icon: Upload },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell({
@@ -67,10 +72,9 @@ export function AppShell({
   }
 
   const signedIn = Boolean(session);
-  const links =
-    session?.role === "admin"
-      ? [...nav, { href: "/settings", label: "Settings", icon: Settings }]
-      : nav;
+  const links = isSuperuser(session?.role)
+    ? [...baseNav, ...superuserNav]
+    : baseNav;
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -117,7 +121,7 @@ export function AppShell({
                   {session?.displayName ?? "Operations"}
                 </span>
                 <span className="text-[10px] font-normal leading-none text-muted-foreground">
-                  {session?.role === "admin" ? "Administrator" : "Workspace"}
+                  {isSuperuser(session?.role) ? "Superuser" : "User"}
                 </span>
               </span>
             </span>

@@ -11,6 +11,7 @@ import {
   parseUnstructuredImportText,
 } from '@backend/import-parse';
 import {getSession} from '@/lib/auth-server';
+import {isSuperuser} from '@backend/roles';
 
 export const runtime = 'nodejs';
 /** Spreadsheet / PDF parsing can exceed the default 10s on large files. */
@@ -86,6 +87,14 @@ function collectImportGroups(rows: ImportExtractResult[]): string[] {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({error: 'Unauthorized.'}, {status: 401});
+    }
+    if (!isSuperuser(session.role)) {
+      return NextResponse.json({error: 'Forbidden.'}, {status: 403});
+    }
+
     const ct = request.headers.get('content-type') ?? '';
     if (!ct.includes('multipart/form-data'))
       return NextResponse.json({error: 'Expected multipart/form-data'}, {status: 400});
@@ -150,7 +159,6 @@ export async function POST(request: Request): Promise<Response> {
     const unstructuredWarning =
       'Extracted fields may be incomplete — layout varies by file type. Always review before importing to production.';
 
-    const session = await getSession();
     const sql = getSql();
     let tripSync:
       | {

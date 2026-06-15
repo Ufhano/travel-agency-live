@@ -1,4 +1,5 @@
 import { hashPassword, verifyPassword } from "./password";
+import { normalizeRole, type UserRole } from "./roles";
 import type { AppUser } from "./users";
 
 type MemoryUser = AppUser & { passwordHash: string };
@@ -88,12 +89,14 @@ export function memoryCreateUser(input: {
   password: string;
   workspaceName: string;
   displayName?: string;
+  role?: UserRole;
 }): { ok: true; user: AppUser } | { ok: false; error: string } {
   bootstrapMemoryAuth();
 
   const username = input.username.trim().toLowerCase();
   const workspaceName = input.workspaceName.trim();
   const displayName = input.displayName?.trim() || workspaceName;
+  const role = normalizeRole(input.role ?? "user");
 
   if (!username || username.length < 2) {
     return { ok: false, error: "Username must be at least 2 characters." };
@@ -128,7 +131,7 @@ export function memoryCreateUser(input: {
     tenantId,
     username,
     displayName,
-    role: "user",
+    role,
     tenantName: workspaceName,
     createdAt: new Date().toISOString(),
     passwordHash: hashPassword(input.password),
@@ -151,12 +154,39 @@ export function memoryDeleteUser(
   const user = users.get(userId);
   if (!user) return { ok: false, error: "User not found." };
   if (user.role === "admin") {
-    return { ok: false, error: "The admin account cannot be deleted." };
+    return { ok: false, error: "Superuser accounts cannot be deleted." };
   }
 
   users.delete(userId);
   usersByUsername.delete(user.username);
   tenants.delete(user.tenantId);
 
+  return { ok: true };
+}
+
+export function memoryUpdateUserRole(
+  userId: string,
+  role: UserRole,
+  actingUserId: string,
+): { ok: true } | { ok: false; error: string } {
+  if (userId === actingUserId) {
+    return { ok: false, error: "You cannot change your own role." };
+  }
+
+  const user = users.get(userId);
+  if (!user) return { ok: false, error: "User not found." };
+
+  const nextRole = normalizeRole(role);
+  const currentRole = normalizeRole(user.role);
+  if (currentRole === nextRole) return { ok: true };
+
+  if (currentRole === "admin" && nextRole === "user") {
+    const adminCount = [...users.values()].filter((u) => u.role === "admin").length;
+    if (adminCount <= 1) {
+      return { ok: false, error: "At least one superuser must remain." };
+    }
+  }
+
+  user.role = nextRole;
   return { ok: true };
 }

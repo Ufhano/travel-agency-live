@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ensureTripsForImportGroups } from "@backend/ensure-import-trips";
 import { getSql } from "@backend/db";
+import { isSuperuser } from "@backend/roles";
 import { getSession } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
@@ -15,6 +16,9 @@ export async function POST(request: Request): Promise<Response> {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  if (!isSuperuser(session.role)) {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
   const sql = getSql();

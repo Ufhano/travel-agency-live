@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSql } from "@backend/db";
 import type { ImportExtractResult } from "@backend/import-parse";
+import { isSuperuser } from "@backend/roles";
 import { saveImportExtractToNeon } from "@backend/import-save";
 import { getSession } from "@/lib/auth-server";
 
@@ -16,6 +17,9 @@ export async function POST(request: Request): Promise<Response> {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  if (!isSuperuser(session.role)) {
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
   const sql = getSql();
