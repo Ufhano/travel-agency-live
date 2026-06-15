@@ -177,7 +177,7 @@ export default function ImportPage() {
       }
       const id = tripId.trim();
       if (!id) {
-        setSaveBanner('Choose a trip in the “Save to database” section above, then save again.');
+        setSaveBanner('Choose a trip for this group, then save again.');
         tripSelectRef.current?.focus();
         return;
       }
@@ -547,6 +547,7 @@ export default function ImportPage() {
 
       {payload && payload.rows.length > 0 ? (
         <div className='space-y-4'>
+          {/* Save to database — bulk fallback UI hidden; use per-group controls below instead.
           <Card className='border-primary/20 bg-primary/[0.03]'>
             <CardHeader className='pb-2'>
               <CardTitle className='flex items-center gap-2 text-base'>
@@ -695,6 +696,7 @@ export default function ImportPage() {
               ) : null}
             </CardContent>
           </Card>
+          */}
 
           <div className='flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between'>
             <h2 className='text-lg font-semibold'>
@@ -722,6 +724,18 @@ export default function ImportPage() {
               </p>
             ) : null}
           </div>
+          {saveBanner ? (
+            <p
+              className={
+                saveBanner.startsWith('Save failed') || saveBanner.includes('failed')
+                  ? 'text-sm text-destructive'
+                  : 'text-sm text-muted-foreground'
+              }
+              role='status'
+            >
+              {saveBanner}
+            </p>
+          ) : null}
           <div className='space-y-8'>
             {groupedByDestination.map(({group, rows}) => {
               const keys = rows.map((row, idx) => makeRowKey(payload.fileName, group, idx, row));
