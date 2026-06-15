@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Split, Upload } from "lucide-react";
+import { CheckCircle2, Loader2, Plus, Split, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +11,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CreateClientInline } from "@/components/create-client-inline";
+import { CreateTripInline } from "@/components/create-trip-inline";
 import { useToast } from "@/components/ui/toast";
 import { formatZAR } from "@/lib/utils";
 import type { Client, Trip } from "@backend/types";
@@ -26,6 +28,19 @@ export function AllocatePaymentForm({
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [clientList, setClientList] = useState<Client[]>(clients);
+  const [tripList, setTripList] = useState<Trip[]>(trips);
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [showCreateTrip, setShowCreateTrip] = useState(false);
+
+  useEffect(() => {
+    setClientList(clients);
+  }, [clients]);
+
+  useEffect(() => {
+    setTripList(trips);
+  }, [trips]);
+
   const [clientId, setClientId] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -40,10 +55,10 @@ export function AllocatePaymentForm({
 
   const sortedClients = useMemo(
     () =>
-      [...clients].sort((a, b) =>
+      [...clientList].sort((a, b) =>
         a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }),
       ),
-    [clients],
+    [clientList],
   );
 
   const allocationSum = useMemo(() => {
@@ -145,7 +160,7 @@ export function AllocatePaymentForm({
       }
 
       const summary = (json.payments ?? []).map((p) => {
-        const trip = trips.find((t) => t.id === p.tripId);
+        const trip = tripList.find((t) => t.id === p.tripId);
         return {
           tripName: trip?.name ?? p.tripId,
           amount: p.amount,
@@ -167,13 +182,15 @@ export function AllocatePaymentForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Step 1 — Select client</CardTitle>
+          <CardDescription>
+            Pick an existing traveller, or create a new one below.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <select
             className="h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            required
           >
             <option value="">Choose a traveller…</option>
             {sortedClients.map((c) => (
@@ -182,6 +199,39 @@ export function AllocatePaymentForm({
               </option>
             ))}
           </select>
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setShowCreateClient((v) => !v)}
+            >
+              <Plus className="h-4 w-4" />
+              {showCreateClient ? "Hide create client" : "Create new client"}
+            </Button>
+          </div>
+          {showCreateClient ? (
+            <CreateClientInline
+              trips={tripList.map((t) => ({
+                id: t.id,
+                name: t.name,
+                destination: t.destination,
+                departureDate: t.departureDate,
+              }))}
+              defaultTripId={clientList.find((c) => c.id === clientId)?.tripId}
+              onCreated={(client) => {
+                setClientList((prev) => {
+                  if (prev.some((c) => c.id === client.id)) return prev;
+                  return [...prev, client];
+                });
+                setClientId(client.id);
+                setShowCreateClient(false);
+                toast(`Created ${client.fullName} and selected them.`, "success");
+                router.refresh();
+              }}
+            />
+          ) : null}
         </CardContent>
       </Card>
 
@@ -238,19 +288,19 @@ export function AllocatePaymentForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {trips.length === 0 ? (
+          {tripList.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No trips available. Create or import a trip first.
+              No trips yet — create one below, or import departures from the Import page.
             </p>
-          ) : trips.length === 1 ? (
+          ) : tripList.length === 1 ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
               Only one departure exists in the database. Import your spreadsheet
               and use &ldquo;Create missing departures&rdquo; on the Import page
               to add Lesotho, Mozambique, and other tabs as separate trips.
             </p>
           ) : null}
-          {trips.length > 0
-            ? [...trips]
+          {tripList.length > 0
+            ? [...tripList]
                 .sort((a, b) => a.departureDate.localeCompare(b.departureDate))
                 .map((t) => {
               const selected = selectedTripIds.has(t.id);
@@ -293,6 +343,44 @@ export function AllocatePaymentForm({
             })
             : null}
 
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setShowCreateTrip((v) => !v)}
+            >
+              <Plus className="h-4 w-4" />
+              {showCreateTrip ? "Hide create trip" : "Create new trip"}
+            </Button>
+          </div>
+          {showCreateTrip ? (
+            <CreateTripInline
+              onCreated={(trip) => {
+                const fullTrip: Trip = {
+                  id: trip.id,
+                  name: trip.name,
+                  destination: trip.destination,
+                  departureDate: trip.departureDate,
+                  capacity: 40,
+                  status: "Open",
+                  accommodationNote: "",
+                };
+                setTripList((prev) => {
+                  if (prev.some((t) => t.id === trip.id)) return prev;
+                  return [...prev, fullTrip].sort((a, b) =>
+                    a.departureDate.localeCompare(b.departureDate),
+                  );
+                });
+                setSelectedTripIds((prev) => new Set([...prev, trip.id]));
+                setShowCreateTrip(false);
+                toast(`Created “${trip.name}” and added it to the list.`, "success");
+                router.refresh();
+              }}
+            />
+          ) : null}
+
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-sm">
             <span className="text-muted-foreground">Allocation total</span>
             <span
@@ -313,7 +401,7 @@ export function AllocatePaymentForm({
 
       <Button
         type="submit"
-        disabled={submitting || !totalsMatch || trips.length === 0}
+        disabled={submitting || !totalsMatch || tripList.length === 0}
         className="gap-2"
       >
         {submitting ? (

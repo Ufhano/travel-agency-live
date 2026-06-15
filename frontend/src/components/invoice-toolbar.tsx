@@ -16,6 +16,7 @@ import {
   invoicePdfFilename,
 } from "@/lib/generate-invoice-pdf";
 import { formatZAR, hasRealClientEmail } from "@/lib/utils";
+import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
 /** Print the on-screen invoice so PDF matches the live layout (styles, logo, fonts). */
 function printInvoice(invoiceNumber: string) {
@@ -254,6 +255,15 @@ export function InvoiceToolbar({
             )}
             Save as PDF
           </Button>
+          <DeleteInvoiceButton
+            paymentId={paymentId}
+            invoiceNumber={invoiceNumber}
+            clientName={clientName}
+            redirectTo="/invoices"
+            variant="outline"
+            size="sm"
+            label="Delete"
+          />
         </div>
       </div>
       {error ? (

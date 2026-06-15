@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 
 import { DbConnectionBanner } from "@/components/db-connection-banner";
+import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
 import { createCompute } from "@backend/compute";
 
@@ -112,6 +113,8 @@ export default async function InvoicesPage() {
 
                 </TableHead>
 
+                <TableHead className="w-10" />
+
               </TableRow>
 
             </TableHeader>
@@ -192,6 +195,14 @@ export default async function InvoicesPage() {
 
                     {formatZAR(r.balanceAfter)}
 
+                  </TableCell>
+
+                  <TableCell>
+                    <DeleteInvoiceButton
+                      paymentId={r.id}
+                      invoiceNumber={r.invoiceNumber}
+                      clientName={r.client.fullName}
+                    />
                   </TableCell>
 
                 </TableRow>

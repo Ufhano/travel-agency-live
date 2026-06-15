@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ClientDetailToolbar } from "@/components/client-detail-toolbar";
 import { ClientInvoicePicker } from "@/components/client-invoice-picker";
+import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
 import {
@@ -215,12 +216,19 @@ export default async function ClientPage({
                       {formatZAR(ctx.balanceAfter)}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/invoices/${p.id}`}>
-                          <FileText className="h-4 w-4" />
-                          <span className="sr-only">Open invoice</span>
-                        </Link>
-                      </Button>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/invoices/${p.id}`}>
+                            <FileText className="h-4 w-4" />
+                            <span className="sr-only">Open invoice</span>
+                          </Link>
+                        </Button>
+                        <DeleteInvoiceButton
+                          paymentId={p.id}
+                          invoiceNumber={p.invoiceNumber}
+                          clientName={client.fullName}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

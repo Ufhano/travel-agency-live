@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CreateTripInline } from "@/components/create-trip-inline";
 import { TripPickerField } from "@/components/trip-picker-field";
 
 type TripOption = {
@@ -46,6 +47,8 @@ const emptyForm = (defaultTripId: string): FormState => ({
 export function AddClientDialog({ trips }: { trips: TripOption[] }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const [tripList, setTripList] = React.useState(trips);
+  const [showCreateTrip, setShowCreateTrip] = React.useState(false);
   const [form, setForm] = React.useState<FormState>(() =>
     emptyForm(trips[0]?.id ?? ""),
   );
@@ -53,13 +56,32 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (open) {
+    setTripList(trips);
+  }, [trips]);
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setTripList(trips);
       setForm(emptyForm(trips[0]?.id ?? ""));
       setError(null);
+      setShowCreateTrip(trips.length === 0);
     }
-  }, [open, trips]);
+    setOpen(next);
+  }
 
-  const noTrips = trips.length === 0;
+  const noTrips = tripList.length === 0;
+
+  function handleTripCreated(trip: TripOption) {
+    setTripList((prev) => {
+      if (prev.some((t) => t.id === trip.id)) return prev;
+      return [...prev, trip].sort((a, b) =>
+        a.departureDate.localeCompare(b.departureDate),
+      );
+    });
+    setForm((prev) => ({ ...prev, tripId: trip.id }));
+    setShowCreateTrip(false);
+    router.refresh();
+  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -69,7 +91,7 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
     event.preventDefault();
     if (submitting) return;
     setError(null);
-    if (!trips.some((t) => t.id === form.tripId)) {
+    if (!tripList.some((t) => t.id === form.tripId)) {
       setError("Choose a departure from the list (search, then select a row).");
       return;
     }
@@ -106,7 +128,7 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
@@ -122,20 +144,46 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
           </DialogDescription>
         </DialogHeader>
 
-        {noTrips ? (
-          <div className="rounded-md border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-300/30 dark:bg-amber-950/40 dark:text-amber-200">
-            You don&apos;t have any trips yet. Import or create a trip before
-            adding clients.
+        {noTrips || showCreateTrip ? (
+          <div className="space-y-4">
+            {noTrips ? (
+              <p className="text-sm text-muted-foreground">
+                Create a departure first, then add the traveller below.
+              </p>
+            ) : null}
+            <CreateTripInline onCreated={handleTripCreated} />
+            {!noTrips ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-0 text-muted-foreground"
+                onClick={() => setShowCreateTrip(false)}
+              >
+                Back to departure list
+              </Button>
+            ) : null}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <TripPickerField
-              id="add-client-trip"
-              label="Trip / departure"
-              options={trips}
-              value={form.tripId}
-              onChange={(tripId) => update("tripId", tripId)}
-            />
+            <div className="space-y-2">
+              <TripPickerField
+                id="add-client-trip"
+                label="Trip / departure"
+                options={tripList}
+                value={form.tripId}
+                onChange={(tripId) => update("tripId", tripId)}
+              />
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs"
+                onClick={() => setShowCreateTrip(true)}
+              >
+                Can&apos;t find your departure? Create a new one
+              </Button>
+            </div>
 
             <div className="grid gap-2">
               <Label htmlFor="add-client-name">Full name</Label>
