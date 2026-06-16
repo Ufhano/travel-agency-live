@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ClientDetailToolbar } from "@/components/client-detail-toolbar";
+import { ClientContactHeader } from "@/components/client-contact-header";
 import { ClientInvoicePicker } from "@/components/client-invoice-picker";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
@@ -45,7 +46,6 @@ export default async function ClientPage({
   const balance = balanceForClient(client);
   const history = paymentsForClient(client.id);
   const monthlyInstallments = collectClientMonthlyInstallments(history);
-  const instalmentsTotal = monthlyInstallments.reduce((s, i) => s + i.amount, 0);
 
   return (
     <div className="space-y-8">
@@ -63,9 +63,7 @@ export default async function ClientPage({
           <h1 className="text-2xl font-semibold tracking-tight">
             {client.fullName}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {client.phone} · {client.email}
-          </p>
+          <ClientContactHeader client={client} className="mt-2" />
           <ClientDetailToolbar
             client={client}
             trip={trip}
@@ -141,9 +139,9 @@ export default async function ClientPage({
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/40 font-medium">
-                  <TableCell colSpan={2}>Total instalments</TableCell>
+                  <TableCell colSpan={2}>Total paid</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatZAR(instalmentsTotal)}
+                    {formatZAR(paid)}
                   </TableCell>
                 </TableRow>
               </TableBody>

@@ -66,7 +66,7 @@ export async function saveImportExtractToNeon(
 
   const clientId = id('c');
   const fullName = row.client.fullName!.trim();
-  const phone = row.client.phone?.trim() || '—';
+  const phone = row.client.phone?.trim() || '';
   const email = row.client.email?.trim() || 'insert@email.com';
   const pkg = Math.max(
     0,
@@ -91,17 +91,29 @@ export async function saveImportExtractToNeon(
 
   const installments =
     row.payment.installments?.filter((i) => i.amount > 0) ?? [];
+  const installmentSum = installments.reduce((s, i) => s + i.amount, 0);
+  const ledgerAmountPaid =
+    row.payment.amount != null && row.payment.amount > 0
+      ? Math.round(row.payment.amount)
+      : null;
+  /** Ledger total (package − outstanding) wins when month columns don't add up. */
+  const saveAsInstallmentRows =
+    installments.length > 0 &&
+    (ledgerAmountPaid == null
+      ? installmentSum > 0
+      : installmentSum === ledgerAmountPaid);
 
-  if (installments.length > 0) {
+  if (saveAsInstallmentRows) {
     let firstPaymentId: string | undefined;
     let paymentError: string | undefined;
     for (let i = 0; i < installments.length; i++) {
       const inst = installments[i]!;
       const paymentId = id('p');
-      const inv = `IMP-${Date.now()}-${randomBytes(3).toString('hex')}-${i + 1}`.slice(
-        0,
-        120,
-      );
+      const inv =
+        `IMP-${Date.now()}-${randomBytes(3).toString('hex')}-${i + 1}`.slice(
+          0,
+          120,
+        );
       try {
         await sql`
           INSERT INTO payments (id, tenant_id, invoice_number, client_id, trip_id, amount, paid_at, method, note)

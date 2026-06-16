@@ -29,6 +29,8 @@ export interface Client {
   fullName: string;
   phone: string;
   email: string;
+  /** National ID / passport number — optional, entered manually. */
+  idNumber: string | null;
   packagePrice: number;
   /** ISO date — balance considered overdue after this if not paid in full. */
   balanceDueDate: string;
@@ -82,4 +84,42 @@ export interface KeyOperationalInsight {
   tripName: string;
   message: string;
   tone: "amber" | "red" | "green";
+}
+
+export type GroupBookingStatus = "Pending" | "Partial" | "Complete";
+
+export type PassengerPaidStatus = "unpaid" | "paid";
+
+export interface GroupBooking {
+  id: string;
+  referenceNumber: string;
+  tripId: string;
+  totalAmount: number;
+  /** ISO date — when the group payment was received. */
+  paidAt: string;
+  status: GroupBookingStatus;
+  createdAt: string;
+  /** Original filename of uploaded proof PDF. */
+  proofFileName?: string;
+}
+
+export interface GroupBookingPassenger {
+  id: string;
+  groupBookingId: string;
+  passengerName: string;
+  passengerEmail: string;
+  amount: number;
+  paidStatus: PassengerPaidStatus;
+  createdAt: string;
+}
+
+export interface GroupBookingWithPassengers extends GroupBooking {
+  tripName: string;
+  tripDestination: string;
+  passengers: GroupBookingPassenger[];
+}
+
+export interface GroupBookingListItem extends GroupBooking {
+  tripName: string;
+  passengerCount: number;
 }

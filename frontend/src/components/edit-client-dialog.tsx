@@ -41,6 +41,7 @@ type FormState = {
   fullName: string;
   phone: string;
   email: string;
+  idNumber: string;
   packagePrice: string;
   balanceDueDate: string;
 };
@@ -53,6 +54,7 @@ function clientToForm(c: Client, trips: Trip[]): FormState {
     fullName: c.fullName,
     phone: c.phone,
     email: c.email,
+    idNumber: c.idNumber ?? "",
     packagePrice: String(c.packagePrice),
     balanceDueDate: c.balanceDueDate.slice(0, 10),
   };
@@ -140,6 +142,7 @@ export function EditClientDialog({
           fullName: form.fullName,
           phone: form.phone,
           email: form.email,
+          idNumber: form.idNumber.trim() || null,
           packagePrice: Number(form.packagePrice),
           balanceDueDate: form.balanceDueDate,
         }),
@@ -278,6 +281,17 @@ export function EditClientDialog({
                     value={form.email}
                     onChange={(e) => update("email", e.target.value)}
                     placeholder="thandi@example.com"
+                  />
+                  <Label htmlFor="edit-client-id" className="text-xs text-muted-foreground">
+                    ID number
+                  </Label>
+                  <Input
+                    id="edit-client-id"
+                    inputMode="text"
+                    autoComplete="off"
+                    value={form.idNumber}
+                    onChange={(e) => update("idNumber", e.target.value)}
+                    placeholder="ID number (optional)"
                   />
                 </div>
               </div>

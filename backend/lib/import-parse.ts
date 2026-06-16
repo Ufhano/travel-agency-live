@@ -952,21 +952,14 @@ function ledgerMonthLabel(month: number, year: number): string {
   return `${abbr}-${yy}`;
 }
 
-/** e.g. "Aug-25", "Sept-25", "Jan-26" → yyyy-mm-01 (normHeader turns "-" into space) */
-function parsePaymentLedgerMonth(cell: unknown): {
-  yyyyMmDd: string;
-  label: string;
-} | null {
-  const label = String(cell ?? '').trim().replace(/\u00a0/g, ' ');
-  if (!label) return null;
-  const normalized = normHeader(label).replace(/\s+/g, ' ');
-  const m = /^([a-z]{3,9})\s+(\d{2}|\d{4})$/.exec(normalized);
-  if (!m) return null;
-
-  const monToken = m[1];
-  const yrStr = m[2];
-
-  const mi = LEDGER_MONTH_INDEX[monToken] ?? LEDGER_MONTH_INDEX[monToken.slice(0, 3)] ?? null;
+function ledgerMonthFromTokens(
+  monToken: string,
+  yrStr: string,
+): {yyyyMmDd: string; label: string} | null {
+  const mi =
+    LEDGER_MONTH_INDEX[monToken] ??
+    LEDGER_MONTH_INDEX[monToken.slice(0, 3)] ??
+    null;
   if (!mi) return null;
 
   let yr = Number.parseInt(yrStr, 10);
@@ -975,7 +968,41 @@ function parsePaymentLedgerMonth(cell: unknown): {
   if (yr < 1980 || yr > 2100) return null;
 
   const mm = String(mi).padStart(2, '0');
-  return {yyyyMmDd: `${yr}-${mm}-01`, label};
+  return {
+    yyyyMmDd: `${yr}-${mm}-01`,
+    label: ledgerMonthLabel(mi, yr),
+  };
+}
+
+/** Fix header typos like "March 20226" → 2026. */
+function normalizeLedgerYearDigits(yrStr: string): string | null {
+  if (/^\d{2}$/.test(yrStr) || /^\d{4}$/.test(yrStr)) return yrStr;
+  // "20226" → 20 + 26 → 2026
+  if (/^\d{5}$/.test(yrStr) && yrStr.startsWith('20')) {
+    return yrStr.slice(0, 2) + yrStr.slice(-2);
+  }
+  return null;
+}
+
+/** e.g. "Aug-25", "Sept-25", "Jan-26", "March 2026" → yyyy-mm-01 (normHeader turns "-" into space) */
+function parsePaymentLedgerMonth(cell: unknown): {
+  yyyyMmDd: string;
+  label: string;
+} | null {
+  const label = String(cell ?? '').trim().replace(/\u00a0/g, ' ');
+  if (!label) return null;
+  const normalized = normHeader(label).replace(/\s+/g, ' ');
+
+  const abbr = /^([a-z]{3,9})\s+(\d{2}|\d{4})$/.exec(normalized);
+  if (abbr) return ledgerMonthFromTokens(abbr[1]!, abbr[2]!);
+
+  const full = /^([a-z]{3,9})\s+(\d{4,5})$/.exec(normalized);
+  if (full) {
+    const yrNorm = normalizeLedgerYearDigits(full[2]!);
+    if (yrNorm) return ledgerMonthFromTokens(full[1]!, yrNorm);
+  }
+
+  return null;
 }
 
 /** Month instalment columns stored as Excel serial dates in header row (raw read). */

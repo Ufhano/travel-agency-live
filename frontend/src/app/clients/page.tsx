@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Split } from "lucide-react";
+import { Split, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -82,6 +82,12 @@ export default async function ClientsPage() {
             <Link href="/payments/allocate">
               <Split className="h-4 w-4" />
               multi-trip
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" asChild>
+            <Link href="/group-bookings/new">
+              <Users className="h-4 w-4" />
+              Group fare split
             </Link>
           </Button>
           <AddClientDialog trips={tripOptions} />

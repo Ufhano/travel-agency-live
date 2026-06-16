@@ -128,9 +128,9 @@ export function collectClientMonthlyInstallments(
     const parsed = parseInstallmentsFromPaymentNote(p.note);
     if (parsed.length > 0) {
       return sortInstallments(
-        parsed.map((p) => ({
-          ...p,
-          paidAt: p.paidAt ?? monthLabelToIsoDate(p.month) ?? undefined,
+        parsed.map((inst) => ({
+          ...inst,
+          paidAt: inst.paidAt ?? monthLabelToIsoDate(inst.month) ?? undefined,
         })),
       );
     }

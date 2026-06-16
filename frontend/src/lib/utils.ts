@@ -1,14 +1,14 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import {clsx, type ClassValue} from 'clsx';
+import {twMerge} from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function formatZAR(amount: number): string {
-  return new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -16,32 +16,53 @@ export function formatZAR(amount: number): string {
 
 /** ZAR with two decimals — matches formal invoices and receipts. */
 export function formatZARInvoice(amount: number): string {
-  return new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
 }
 
+/** Format an integer amount with a 3-letter currency code (whole units). */
+export function formatMoney(amount: number, currency: string): string {
+  const code = currency.trim().toUpperCase() || 'ZAR';
+  try {
+    return new Intl.NumberFormat('en-ZA', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${code} ${amount.toLocaleString('en-ZA')}`;
+  }
+}
+
 export function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-ZA", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
+  return new Intl.DateTimeFormat('en-ZA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
   }).format(new Date(iso));
 }
 
 export function formatDateLong(iso: string): string {
-  return new Intl.DateTimeFormat("en-ZA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+  return new Intl.DateTimeFormat('en-ZA', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   }).format(new Date(iso));
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PLACEHOLDER_EMAILS = new Set(["insert@email.com", "n/a", "na", "none", "—"]);
+const PLACEHOLDER_EMAILS = new Set([
+  'insert@email.com',
+  'n/a',
+  'na',
+  'none',
+  '—',
+]);
 
 /** True when the client has a real email (not import placeholder). */
 export function hasRealClientEmail(email: string | null | undefined): boolean {
@@ -53,19 +74,19 @@ export function hasRealClientEmail(email: string | null | undefined): boolean {
 
 /** Long-form date for today (e.g. 8 June 2026). */
 export function formatTodayLong(): string {
-  return new Intl.DateTimeFormat("en-ZA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+  return new Intl.DateTimeFormat('en-ZA', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   }).format(new Date());
 }
 
 export function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-ZA", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Intl.DateTimeFormat('en-ZA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(iso));
 }

@@ -20,6 +20,7 @@ type NewClientInput = {
   fullName?: unknown;
   phone?: unknown;
   email?: unknown;
+  idNumber?: unknown;
   packagePrice?: unknown;
   balanceDueDate?: unknown;
 };
@@ -29,6 +30,7 @@ type ClientUpsertFields = {
   fullName: string;
   phone: string;
   email: string;
+  idNumber: string | null;
   packagePrice: number;
   balanceDueDate: string;
 };
@@ -51,6 +53,7 @@ function parseClientUpsertFields(body: NewClientInput):
   const fullName = asString(body.fullName);
   const phone = asString(body.phone);
   const email = asString(body.email);
+  const idNumber = asString(body.idNumber) || null;
   const balanceDueDate = asString(body.balanceDueDate);
   const priceRaw =
     typeof body.packagePrice === "number"
@@ -77,6 +80,7 @@ function parseClientUpsertFields(body: NewClientInput):
       fullName,
       phone,
       email,
+      idNumber,
       packagePrice: Math.round(priceRaw),
       balanceDueDate,
     },
@@ -103,7 +107,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const parsed = parseClientUpsertFields(body);
   if (!parsed.ok) return badRequest(parsed.error);
-  const { tripId, fullName, phone, email, packagePrice, balanceDueDate } =
+  const { tripId, fullName, phone, email, idNumber, packagePrice, balanceDueDate } =
     parsed.fields;
   const id = `c-${randomUUID()}`;
 
@@ -113,6 +117,7 @@ export async function POST(request: Request): Promise<Response> {
     fullName,
     phone,
     email,
+    idNumber,
     packagePrice,
     balanceDueDate,
   };
@@ -136,9 +141,9 @@ export async function POST(request: Request): Promise<Response> {
 
     await sql`
       INSERT INTO clients
-        (id, tenant_id, trip_id, full_name, phone, email, package_price, balance_due_date)
+        (id, tenant_id, trip_id, full_name, phone, email, id_number, package_price, balance_due_date)
       VALUES
-        (${id}, ${session.tenantId}, ${tripId}, ${fullName}, ${phone}, ${email}, ${packagePrice}, ${balanceDueDate})
+        (${id}, ${session.tenantId}, ${tripId}, ${fullName}, ${phone}, ${email}, ${idNumber}, ${packagePrice}, ${balanceDueDate})
     `;
 
     return NextResponse.json({ ok: true, client: newClient }, { status: 201 });
@@ -174,7 +179,7 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const parsed = parseClientUpsertFields(body);
   if (!parsed.ok) return badRequest(parsed.error);
-  const { tripId, fullName, phone, email, packagePrice, balanceDueDate } =
+  const { tripId, fullName, phone, email, idNumber, packagePrice, balanceDueDate } =
     parsed.fields;
 
   const sql = getSql();
@@ -198,6 +203,7 @@ export async function PATCH(request: Request): Promise<Response> {
       fullName,
       phone,
       email,
+      idNumber,
       packagePrice,
       balanceDueDate,
     };
@@ -234,6 +240,7 @@ export async function PATCH(request: Request): Promise<Response> {
         full_name = ${fullName},
         phone = ${phone},
         email = ${email},
+        id_number = ${idNumber},
         package_price = ${packagePrice},
         balance_due_date = ${balanceDueDate}
       WHERE id = ${clientId} AND tenant_id = ${session.tenantId}
@@ -253,6 +260,7 @@ export async function PATCH(request: Request): Promise<Response> {
       fullName,
       phone,
       email,
+      idNumber,
       packagePrice,
       balanceDueDate,
     };
