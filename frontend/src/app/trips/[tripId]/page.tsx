@@ -49,11 +49,11 @@ export default async function TripPage({
     <div className="space-y-8">
       {dbError ? <DbConnectionBanner message={dbError} /> : null}
       <Link
-        href="/"
+        href="/trips"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to operations dashboard
+        Back to trips
       </Link>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

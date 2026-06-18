@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Settings,
   Upload,
   Users,
@@ -21,6 +22,7 @@ const baseNav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/invoices", label: "Invoices", icon: FileText },
+  { href: "/trips", label: "Trips", icon: MapPin },
 ];
 
 const superuserNav = [
