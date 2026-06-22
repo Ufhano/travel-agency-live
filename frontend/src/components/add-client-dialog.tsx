@@ -202,7 +202,6 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
                 <Label htmlFor="add-client-phone">Phone</Label>
                 <Input
                   id="add-client-phone"
-                  required
                   inputMode="tel"
                   autoComplete="tel"
                   value={form.phone}

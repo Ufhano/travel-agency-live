@@ -115,7 +115,6 @@ export function CreateClientInline({
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+27 82 555 0123"
-            required
           />
         </div>
         <div className="space-y-1.5">

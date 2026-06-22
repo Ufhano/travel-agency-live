@@ -10,7 +10,7 @@ import type { Client } from "@backend/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type ContactField = "email" | "idNumber";
+type ContactField = "email" | "phone" | "idNumber";
 
 const FIELD_CONFIG: Record<
   ContactField,
@@ -37,6 +37,18 @@ const FIELD_CONFIG: Record<
     toPatch: (v) => ({ email: v }),
     validate: (v) =>
       EMAIL_RE.test(v) ? null : "Enter a valid email address.",
+    valueClassName: "min-w-0 hover:underline",
+  },
+  phone: {
+    label: "Phone:",
+    emptyLabel: "Add phone",
+    editAria: (has) => (has ? "Edit phone" : "Add phone"),
+    placeholder: "e.g. 082 123 4567",
+    inputType: "tel",
+    leadingDot: true,
+    getValue: (c) => c.phone?.trim() ?? "",
+    toPatch: (v) => ({ phone: v }),
+    validate: () => null,
     valueClassName: "min-w-0 hover:underline",
   },
   idNumber: {
@@ -120,7 +132,8 @@ export function ClientInlineContactField({
     setEditing(false);
   }
 
-  const editLabel = field === "email" ? "Email" : "ID number";
+  const editLabel =
+    field === "email" ? "Email" : field === "phone" ? "Phone" : "ID number";
 
   if (!editing) {
     return (

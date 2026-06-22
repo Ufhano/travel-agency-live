@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, Paperclip } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -14,9 +14,12 @@ import { Button } from "@/components/ui/button";
 import { ClientDetailToolbar } from "@/components/client-detail-toolbar";
 import { ClientContactHeader } from "@/components/client-contact-header";
 import { ClientInvoicePicker } from "@/components/client-invoice-picker";
+import { RecordBalancePaymentForm } from "@/components/record-balance-payment-form";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { createCompute } from "@backend/compute";
+import { getClientPaymentsWithDocuments } from "@backend/documents";
+import { getSql } from "@backend/db";
 import {
   collectClientMonthlyInstallments,
   paymentMonthLabel,
@@ -30,7 +33,7 @@ export default async function ClientPage({
   params: Promise<{ clientId: string }>;
 }) {
   const { clientId } = await params;
-  const { data: app, dbError } = await loadAppDataForPage();
+  const { data: app, dbError, session } = await loadAppDataForPage();
   const {
     balanceForClient,
     enrichPayment,
@@ -46,6 +49,20 @@ export default async function ClientPage({
   const balance = balanceForClient(client);
   const history = paymentsForClient(client.id);
   const monthlyInstallments = collectClientMonthlyInstallments(history);
+
+  const sql = getSql();
+  let paymentsWithProof = new Set<string>();
+  if (sql) {
+    try {
+      paymentsWithProof = await getClientPaymentsWithDocuments(
+        sql,
+        session.tenantId,
+        client.id,
+      );
+    } catch {
+      paymentsWithProof = new Set<string>();
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -100,6 +117,14 @@ export default async function ClientPage({
           </CardContent>
         </Card>
       </div>
+
+      {balance > 0 ? (
+        <RecordBalancePaymentForm
+          clientId={client.id}
+          tripId={client.tripId}
+          balance={balance}
+        />
+      ) : null}
 
       <ClientInvoicePicker
         clientId={client.id}
@@ -215,6 +240,19 @@ export default async function ClientPage({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-0.5">
+                        {paymentsWithProof.has(p.id) ? (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a
+                              href={`/api/payments/${p.id}/proof`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="View proof of payment"
+                            >
+                              <Paperclip className="h-4 w-4" />
+                              <span className="sr-only">View proof of payment</span>
+                            </a>
+                          </Button>
+                        ) : null}
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/invoices/${p.id}`}>
                             <FileText className="h-4 w-4" />

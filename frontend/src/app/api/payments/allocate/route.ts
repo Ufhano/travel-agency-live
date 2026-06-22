@@ -33,6 +33,16 @@ export async function POST(request: Request): Promise<Response> {
       : "";
   const totalAmountRaw = form.get("totalAmount");
   const allocationsRaw = form.get("allocations");
+  const methodRaw = form.get("method");
+  const noteRaw = form.get("note");
+  const method =
+    typeof methodRaw === "string" && methodRaw.trim()
+      ? methodRaw.trim()
+      : "Allocation";
+  const note =
+    typeof noteRaw === "string" && noteRaw.trim()
+      ? noteRaw.trim()
+      : "Multi-trip payment allocation";
 
   if (!clientId) {
     return NextResponse.json({ error: "Client is required." }, { status: 400 });
@@ -56,42 +66,51 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const file = form.get("file");
-  if (!file || typeof file !== "object" || !("arrayBuffer" in file)) {
-    return NextResponse.json(
-      { error: "Proof of payment PDF is required." },
-      { status: 400 },
-    );
-  }
+  const hasFile =
+    file &&
+    typeof file === "object" &&
+    "arrayBuffer" in file &&
+    (file as File).size > 0;
 
-  const typed = file as File;
-  const pdfError = validatePdfUpload(typed);
-  if (pdfError) {
-    return NextResponse.json({ error: pdfError }, { status: 400 });
-  }
-
-  const buffer = Buffer.from(await typed.arrayBuffer());
-
-  if (sql) {
-    await insertClientDocument(
-      sql,
-      session.tenantId,
-      clientId,
-      "Payment allocation proof",
-      typed.name || "proof.pdf",
-      buffer,
-    );
+  let proof: { fileName: string; buffer: Buffer } | null = null;
+  if (hasFile) {
+    const typed = file as File;
+    const pdfError = validatePdfUpload(typed);
+    if (pdfError) {
+      return NextResponse.json({ error: pdfError }, { status: 400 });
+    }
+    proof = {
+      fileName: typed.name || "proof.pdf",
+      buffer: Buffer.from(await typed.arrayBuffer()),
+    };
   }
 
   const result = await allocatePaymentToTrips(sql ?? null, session.tenantId, {
     clientId,
     totalAmount,
     allocations,
-    method: "Allocation",
-    note: "Multi-trip payment allocation",
+    method,
+    note,
   });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  // Attach the proof PDF to each created payment so it is accessible next to
+  // the matching receipt in the traveller's payment history.
+  if (proof && sql && result.payments.length > 0) {
+    for (const created of result.payments) {
+      await insertClientDocument(
+        sql,
+        session.tenantId,
+        clientId,
+        "Payment allocation proof",
+        proof.fileName,
+        proof.buffer,
+        created.paymentId,
+      );
+    }
   }
 
   return NextResponse.json({

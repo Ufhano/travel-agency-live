@@ -263,7 +263,6 @@ export function EditClientDialog({
                   <Label htmlFor="edit-client-phone">Phone</Label>
                   <Input
                     id="edit-client-phone"
-                    required
                     inputMode="tel"
                     autoComplete="tel"
                     value={form.phone}

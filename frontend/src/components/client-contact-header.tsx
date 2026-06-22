@@ -19,9 +19,8 @@ export function ClientContactHeader({
         className,
       )}
     >
-      <span>{client.phone}</span>
-      <span aria-hidden>·</span>
       <ClientInlineContactField client={client} field="email" variant="inline" />
+      <ClientInlineContactField client={client} field="phone" variant="inline" />
       <ClientInlineContactField client={client} field="idNumber" variant="inline" />
     </div>
   );

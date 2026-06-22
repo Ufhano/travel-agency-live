@@ -29,6 +29,10 @@ export async function ensureClientDocumentsSchema(
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_client_documents_client ON client_documents (client_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_client_documents_tenant ON client_documents (tenant_id)`;
+  // Link a proof document to the specific payment it belongs to (added later;
+  // existing tables are migrated in place).
+  await sql`ALTER TABLE client_documents ADD COLUMN IF NOT EXISTS payment_id TEXT`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_client_documents_payment ON client_documents (payment_id)`;
 }
 
 export function validatePdfUpload(
@@ -52,14 +56,73 @@ export async function insertClientDocument(
   title: string,
   fileName: string,
   buffer: Buffer,
+  paymentId: string | null = null,
 ): Promise<{ id: string }> {
   await ensureClientDocumentsSchema(sql);
   const docId = id("doc");
   await sql`
-    INSERT INTO client_documents (id, tenant_id, client_id, title, file_name, content_type, file_data)
-    VALUES (${docId}, ${tenantId}, ${clientId}, ${title}, ${fileName}, ${PDF_MIME}, ${buffer})
+    INSERT INTO client_documents (id, tenant_id, client_id, payment_id, title, file_name, content_type, file_data)
+    VALUES (${docId}, ${tenantId}, ${clientId}, ${paymentId}, ${title}, ${fileName}, ${PDF_MIME}, ${buffer})
   `;
   return { id: docId };
+}
+
+/** Payment IDs (for a client) that have at least one proof document attached. */
+export async function getClientPaymentsWithDocuments(
+  sql: SqlExecutor,
+  tenantId: string,
+  clientId: string,
+): Promise<Set<string>> {
+  await ensureClientDocumentsSchema(sql);
+  const rows = (await sql`
+    SELECT DISTINCT payment_id
+    FROM client_documents
+    WHERE client_id = ${clientId}
+      AND tenant_id = ${tenantId}
+      AND payment_id IS NOT NULL
+  `) as { payment_id: string | null }[];
+  const set = new Set<string>();
+  for (const row of rows) {
+    if (row.payment_id) set.add(row.payment_id);
+  }
+  return set;
+}
+
+/** Latest proof document attached to a specific payment, if any. */
+export async function getPaymentProofDocument(
+  sql: SqlExecutor,
+  tenantId: string,
+  paymentId: string,
+): Promise<{
+  fileName: string;
+  contentType: string;
+  buffer: Buffer;
+} | null> {
+  await ensureClientDocumentsSchema(sql);
+  const rows = (await sql`
+    SELECT file_name, content_type, file_data
+    FROM client_documents
+    WHERE payment_id = ${paymentId} AND tenant_id = ${tenantId}
+    ORDER BY uploaded_at DESC
+    LIMIT 1
+  `) as {
+    file_name: string;
+    content_type: string;
+    file_data: Buffer | Uint8Array;
+  }[];
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const buffer = Buffer.isBuffer(row.file_data)
+    ? row.file_data
+    : Buffer.from(row.file_data);
+
+  return {
+    fileName: row.file_name,
+    contentType: row.content_type || PDF_MIME,
+    buffer,
+  };
 }
 
 export async function ensureGroupBookingDocumentsSchema(
