@@ -44,16 +44,31 @@ const emptyForm = (defaultTripId: string): FormState => ({
   balanceDueDate: "",
 });
 
-export function AddClientDialog({ trips }: { trips: TripOption[] }) {
+export function AddClientDialog({
+  trips,
+  defaultTripId,
+  lockTrip = false,
+  triggerLabel = "Add client",
+}: {
+  trips: TripOption[];
+  defaultTripId?: string;
+  lockTrip?: boolean;
+  triggerLabel?: string;
+}) {
   const router = useRouter();
+  const initialTripId = defaultTripId ?? trips[0]?.id ?? "";
   const [open, setOpen] = React.useState(false);
   const [tripList, setTripList] = React.useState(trips);
   const [showCreateTrip, setShowCreateTrip] = React.useState(false);
   const [form, setForm] = React.useState<FormState>(() =>
-    emptyForm(trips[0]?.id ?? ""),
+    emptyForm(initialTripId),
   );
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const lockedTrip = lockTrip
+    ? tripList.find((t) => t.id === defaultTripId)
+    : undefined;
 
   React.useEffect(() => {
     setTripList(trips);
@@ -62,9 +77,9 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
   function handleOpenChange(next: boolean) {
     if (next) {
       setTripList(trips);
-      setForm(emptyForm(trips[0]?.id ?? ""));
+      setForm(emptyForm(defaultTripId ?? trips[0]?.id ?? ""));
       setError(null);
-      setShowCreateTrip(trips.length === 0);
+      setShowCreateTrip(!lockTrip && trips.length === 0);
     }
     setOpen(next);
   }
@@ -132,7 +147,7 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
-          Add client
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -166,24 +181,41 @@ export function AddClientDialog({ trips }: { trips: TripOption[] }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <TripPickerField
-                id="add-client-trip"
-                label="Trip / departure"
-                options={tripList}
-                value={form.tripId}
-                onChange={(tripId) => update("tripId", tripId)}
-              />
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0 text-xs"
-                onClick={() => setShowCreateTrip(true)}
-              >
-                Can&apos;t find your departure? Create a new one
-              </Button>
-            </div>
+            {lockTrip ? (
+              <div className="space-y-1">
+                <Label>Trip / departure</Label>
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                  <span className="font-medium">
+                    {lockedTrip?.name ?? "Selected departure"}
+                  </span>
+                  {lockedTrip?.destination ? (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — {lockedTrip.destination}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <TripPickerField
+                  id="add-client-trip"
+                  label="Trip / departure"
+                  options={tripList}
+                  value={form.tripId}
+                  onChange={(tripId) => update("tripId", tripId)}
+                />
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs"
+                  onClick={() => setShowCreateTrip(true)}
+                >
+                  Can&apos;t find your departure? Create a new one
+                </Button>
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="add-client-name">Full name</Label>

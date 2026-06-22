@@ -23,9 +23,11 @@ import { TripStatusBadge } from "@/components/trip-status-badge";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { DeleteClientButton } from "@/components/delete-client-button";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
+import { AddClientDialog } from "@/components/add-client-dialog";
+import { InlineTripDateCell } from "@/components/inline-trip-date-cell";
 import { createCompute } from "@backend/compute";
 import { loadAppDataForPage } from "@/lib/page-data";
-import { formatDate, formatZAR } from "@/lib/utils";
+import { formatZAR } from "@/lib/utils";
 
 export default async function TripPage({
   params,
@@ -45,6 +47,13 @@ export default async function TripPage({
 
   const status = displayTripStatus(agg.trip, agg);
 
+  const tripOptions = data.trips.map((t) => ({
+    id: t.id,
+    name: t.name,
+    destination: t.destination,
+    departureDate: t.departureDate,
+  }));
+
   return (
     <div className="space-y-8">
       {dbError ? <DbConnectionBanner message={dbError} /> : null}
@@ -62,10 +71,14 @@ export default async function TripPage({
             {agg.trip.name}
           </h1>
           <p className="mt-1 text-muted-foreground">{agg.trip.destination}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <TripStatusBadge status={status} />
-            <Badge variant="outline">
-              Departs {formatDate(agg.trip.departureDate)}
+            <Badge variant="outline" className="gap-1.5 font-normal">
+              <span className="text-muted-foreground">Departs</span>
+              <InlineTripDateCell
+                tripId={agg.trip.id}
+                departureDate={agg.trip.departureDate}
+              />
             </Badge>
           </div>
         </div>
@@ -156,17 +169,25 @@ export default async function TripPage({
               Open a name for balances; every payment has its own invoice record.
             </CardDescription>
           </div>
-          {agg.clients.length > 0 ? (
-            <DeleteClientsBulkButton
-              mode={{
-                kind: "trip",
-                tripId: agg.trip.id,
-                label: agg.trip.name,
-                count: agg.clients.length,
-              }}
-              redirectTo="/"
+          <div className="flex flex-wrap items-center gap-2">
+            <AddClientDialog
+              trips={tripOptions}
+              defaultTripId={agg.trip.id}
+              lockTrip
+              triggerLabel="Add person"
             />
-          ) : null}
+            {agg.clients.length > 0 ? (
+              <DeleteClientsBulkButton
+                mode={{
+                  kind: "trip",
+                  tripId: agg.trip.id,
+                  label: agg.trip.name,
+                  count: agg.clients.length,
+                }}
+                redirectTo="/"
+              />
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="p-0 sm:px-6">
           <Table>

@@ -24,3 +24,31 @@ export async function renameTripLabel(
   }
   return { ok: true };
 }
+
+/** Update a departure date (expects YYYY-MM-DD). */
+export async function updateTripDepartureDate(
+  tripId: string,
+  departureDate: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = departureDate.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return { ok: false, error: "Pick a valid date." };
+  }
+
+  const res = await fetch("/api/trips", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: tripId,
+      departureDate: trimmed,
+    }),
+  });
+  const data = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: data?.error ?? `Failed to save date (HTTP ${res.status}).`,
+    };
+  }
+  return { ok: true };
+}

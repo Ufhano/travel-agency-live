@@ -11,9 +11,10 @@ import {
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { TripStatusBadge } from "@/components/trip-status-badge";
 import { TripsCreatePanel } from "@/components/trips-create-panel";
+import { InlineTripDateCell } from "@/components/inline-trip-date-cell";
 import { createCompute } from "@backend/compute";
 import { loadAppDataForPage } from "@/lib/page-data";
-import { formatDate, formatZAR } from "@/lib/utils";
+import { formatZAR } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +102,10 @@ export default async function TripsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell whitespace-nowrap text-muted-foreground">
-                        {formatDate(trip.departureDate)}
+                        <InlineTripDateCell
+                          tripId={trip.id}
+                          departureDate={trip.departureDate}
+                        />
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-right tabular-nums text-muted-foreground">
                         {agg.confirmedCount} / {trip.capacity}
