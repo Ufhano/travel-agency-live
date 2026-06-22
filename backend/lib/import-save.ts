@@ -1,5 +1,6 @@
 import {randomBytes} from 'node:crypto';
 
+import {sanitizeIsoYear} from './date-year';
 import type {ImportExtractResult} from './import-parse';
 
 type SqlExecutor = (
@@ -33,14 +34,14 @@ function paidAtIso(row: ImportExtractResult): string {
   const raw = row.payment.paidAt?.trim();
   if (raw) {
     const d = new Date(raw);
-    if (!Number.isNaN(d.valueOf())) return d.toISOString();
+    if (!Number.isNaN(d.valueOf())) return sanitizeIsoYear(d.toISOString());
   }
   return new Date().toISOString();
 }
 
 function instalmentPaidAtIso(paidAt: string): string {
   const d = new Date(`${paidAt.slice(0, 10)}T12:00:00.000Z`);
-  if (!Number.isNaN(d.valueOf())) return d.toISOString();
+  if (!Number.isNaN(d.valueOf())) return sanitizeIsoYear(d.toISOString());
   return new Date().toISOString();
 }
 

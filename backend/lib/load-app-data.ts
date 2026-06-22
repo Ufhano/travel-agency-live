@@ -1,4 +1,5 @@
 import { trips, clients, payments } from "./data";
+import { sanitizeIsoYear } from "./date-year";
 import { getSql } from "./db";
 import { tripTenantById } from "./tenant-scope";
 import type { AppData } from "./app-data";
@@ -141,10 +142,13 @@ type PaymentRow = {
 
 function isoDateSlice(value: string | Date): string {
   const s = typeof value === "string" ? value : value.toISOString();
-  return s.length >= 10 ? s.slice(0, 10) : s;
+  return sanitizeIsoYear(s.length >= 10 ? s.slice(0, 10) : s);
 }
 
 function isoDateTime(value: string | Date): string {
-  if (typeof value === "string") return value;
-  return value.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const s =
+    typeof value === "string"
+      ? value
+      : value.toISOString().replace(/\.\d{3}Z$/, "Z");
+  return sanitizeIsoYear(s);
 }

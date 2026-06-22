@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 
+import { sanitizeIsoYear } from './date-year';
 import { isXlsxBuffer, runPythonExcelExtract } from './ingestion/parse-excel-python';
 import type { PaymentInstallment } from './payment-schedule';
 
@@ -551,8 +552,13 @@ function monthWordToMm(w: string): string | null {
   return map[m] ?? null;
 }
 
-/** Excel serial or common date strings → ISO yyyy-mm-dd or null */
+/** Excel serial or common date strings → ISO yyyy-mm-dd or null (year-sanitized). */
 function coerceDate(val: unknown): string | null {
+  const raw = coerceDateRaw(val);
+  return raw == null ? raw : sanitizeIsoYear(raw);
+}
+
+function coerceDateRaw(val: unknown): string | null {
   if (val == null || val === '') return null;
   if (typeof val === 'number' && Number.isFinite(val)) {
     /* Instalment amounts (1500, 4600) are not Excel serial dates. */
