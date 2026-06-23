@@ -22,6 +22,10 @@ export async function generateInvoicePdfBlob(
   const node = document.getElementById("invoice-print");
   if (!node) throw new Error("Invoice not found on page.");
 
+  // Remember the user's scroll position so we can restore it after capture.
+  const prevScrollX = window.scrollX;
+  const prevScrollY = window.scrollY;
+
   node.scrollIntoView({ block: "start" });
   await document.fonts.ready;
   await waitForImages(node);
@@ -117,6 +121,8 @@ export async function generateInvoicePdfBlob(
   } finally {
     node.style.overflow = prevOverflow;
     node.style.height = prevHeight;
+    // Return the user to where they were before the capture scrolled the page.
+    window.scrollTo(prevScrollX, prevScrollY);
   }
 }
 

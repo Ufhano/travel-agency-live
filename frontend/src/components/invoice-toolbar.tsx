@@ -144,22 +144,51 @@ export function InvoiceToolbar({
     setFeedback(null);
     try {
       const file = await buildPdfFile();
-      const body = new FormData();
-      body.set("pdf", file);
-      body.set("filename", file.name);
+      const subject = `Invoice ${invoiceNumber} — ${tripName}`;
+      const emailBody = [
+        `Dear ${clientName},`,
+        "",
+        "Please find your invoice attached as a PDF.",
+        "",
+        `Invoice number: ${invoiceNumber}`,
+        `Trip: ${tripName}`,
+        `Amount paid: ${formatZAR(amount)}`,
+        `Outstanding: ${formatZAR(balance)}`,
+        "",
+        "Thank you for travelling with Nendila Travel & Explorers.",
+      ].join("\n");
 
-      const res = await fetch(
-        `/api/invoices/${encodeURIComponent(paymentId)}/send-email`,
-        { method: "POST", body },
-      );
-      const json = (await res.json()) as { error?: string; message?: string };
-      if (!res.ok) {
-        setError(json.error ?? "Could not send email.");
+      const shareData: ShareData = {
+        files: [file],
+        title: subject,
+        text: emailBody,
+      };
+
+      if (navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+        setFeedback("Invoice PDF shared — choose your email app to send with attachment.");
         return;
       }
-      setFeedback(json.message ?? "Invoice PDF sent by email.");
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(file);
+      link.download = file.name;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      const gmailUrl =
+        "https://mail.google.com/mail/?view=cm&fs=1" +
+        `&to=${encodeURIComponent(clientEmail)}` +
+        `&su=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(emailBody)}`;
+      window.open(gmailUrl, "_blank", "noopener,noreferrer");
+
+      setFeedback(
+        "PDF downloaded and a Gmail compose window opened. Click the attach (paperclip) icon and choose the downloaded invoice PDF, then send.",
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send email.");
+      if (e instanceof Error && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Could not open email.");
     } finally {
       setBusy(null);
     }

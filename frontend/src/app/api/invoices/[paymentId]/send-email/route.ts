@@ -79,7 +79,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Email is not configured. Set RESEND_API_KEY and EMAIL_FROM in Vercel.",
+            "Email is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.",
         },
         { status: 503 },
       );
