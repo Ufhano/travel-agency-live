@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { isSuperuser } from "@backend/roles";
+import { SettingsInvoiceTermsPanel } from "@/components/settings-invoice-terms-panel";
 import { SettingsUsersPanel } from "@/components/settings-users-panel";
 import { getSession } from "@/lib/auth-server";
 
@@ -17,6 +18,7 @@ export default async function SettingsPage() {
           users work in their own workspace with limited permissions.
         </p>
       </div>
+      <SettingsInvoiceTermsPanel />
       <SettingsUsersPanel />
     </div>
   );

@@ -3,16 +3,21 @@ type SqlExecutor = (
   ...values: unknown[]
 ) => Promise<unknown>;
 
-/** Next sequential INV-0001 style number for a tenant (padded to 4 digits). */
+/**
+ * Next sequential INV-0001 style number (padded to 4 digits).
+ *
+ * `invoice_number` is globally unique across all tenants, so the sequence is
+ * computed globally to avoid collisions. The `tenantId` arg is kept for
+ * call-site compatibility but is not used for scoping.
+ */
 export async function nextInvoiceNumber(
   sql: SqlExecutor,
-  tenantId: string,
+  _tenantId: string,
 ): Promise<string> {
   const rows = (await sql`
     SELECT invoice_number
     FROM payments
-    WHERE tenant_id = ${tenantId}
-      AND invoice_number LIKE 'INV-%'
+    WHERE invoice_number LIKE 'INV-%'
   `) as { invoice_number: string }[];
 
   let max = 0;

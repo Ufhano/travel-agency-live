@@ -68,7 +68,7 @@ export default async function InvoiceDetailPage({
 
       />
 
-      <InvoicePrintBody ctx={ctx} />
+      <InvoicePrintBody ctx={ctx} terms={app.invoiceTerms} />
 
     </div>
 

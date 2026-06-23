@@ -1,7 +1,9 @@
 import type {PaymentWithContext} from '@backend/types';
+import {DEFAULT_INVOICE_TERMS} from '@backend/invoice-terms';
 import {Dancing_Script} from 'next/font/google';
 import Image from 'next/image';
 import {Mail, MapPin, Phone} from 'lucide-react';
+import {InvoiceTermsSection} from '@/components/invoice-terms-section';
 import {InvoiceTodayDate} from '@/components/invoice-today-date';
 import {formatDate, formatZARInvoice, hasRealClientEmail} from '@/lib/utils';
 
@@ -29,20 +31,6 @@ function WhatsAppMark({className}: {className?: string}) {
     </svg>
   );
 }
-
-/** Wording preserved from Mulisa Mapfumo Lesotho template (.docx). */
-const TERMS = [
-  'A non- refundable deposit of R800-00 per person is payable to Secure the booking.',
-  'The remaining amount should be paid in instalments.',
-  'Note that the snow activities are not included on the package',
-  '50% of the about must be paid 2 months before departure',
-  'The full amount must be paid on or before 30 days of departure.',
-  'Cancellations within 30 days of departure results to no refund.',
-  'Cancellations due to what so ever reason when everything has been booked results to no refund, the only option available is for you to get a replacement from your side.',
-  'No moving from one date to another or from one trip to another unless when we suggest it.',
-  'Please note that it is your responsibility to make sure that you have a valid passport during the time of travelling.',
-  'Note that the activities are not compulsory and Nendila Travel & Explorers will not be held responsible for any damages, loss and accidents that may occur during the activities.',
-] as const;
 
 function packageDescription(ctx: PaymentWithContext): string {
   const parts = [
@@ -77,11 +65,16 @@ function clientContactLine(ctx: PaymentWithContext): string | null {
 export function InvoicePrintBody({
   ctx,
   variant = 'payment',
+  terms,
 }: {
   ctx: PaymentWithContext;
   /** `payment` = single receipt. `partial` / `full` = client statement. */
   variant?: 'payment' | 'partial' | 'full';
+  /** Per-tenant Terms & Conditions lines; falls back to the default template. */
+  terms?: string[];
 }) {
+  const termsList =
+    terms && terms.length > 0 ? terms : DEFAULT_INVOICE_TERMS;
   const desc = packageDescription(ctx);
   const packageHeader = packageColumnHeader(ctx);
   const contactLine = clientContactLine(ctx);
@@ -91,8 +84,7 @@ export function InvoicePrintBody({
       : variant === 'partial'
         ? ctx.totalPaidAfter
         : ctx.amount;
-  const balance =
-    variant === 'full' ? 0 : ctx.balanceAfter;
+  const balance = variant === 'full' ? 0 : ctx.balanceAfter;
   const ribbonLabel =
     variant === 'full'
       ? 'INVOICE — PAID IN FULL'
@@ -293,25 +285,8 @@ export function InvoicePrintBody({
           </table>
         </div>
 
-        {/* Terms */}
-        <section className='mt-10 break-inside-avoid border border-slate-200 bg-slate-50/80 p-5 sm:p-6 print:border-black/20 print:bg-white'>
-          <h2
-            className='text-center text-sm font-bold uppercase tracking-wide sm:text-base'
-            style={{color: TEAL_DEEP}}
-          >
-            TERMS AND CONDITIONS
-          </h2>
-          <ol className='mt-4 list-none space-y-2.5 text-[13px] leading-relaxed text-slate-800'>
-            {TERMS.map((t, i) => (
-              <li key={i} className='flex gap-2'>
-                <span className='w-5 shrink-0 font-medium tabular-nums'>
-                  {i + 1}.
-                </span>
-                <span>{t}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
+        {/* Terms — editable inline; saves workspace-wide via the settings API. */}
+        <InvoiceTermsSection initialTerms={termsList} />
 
         <div className='mt-10 flex flex-wrap items-end gap-x-10 gap-y-4 border-t border-slate-200 pt-6 text-sm print:border-black/20'>
           <div className='min-w-[12rem] flex-1'>

@@ -8,7 +8,8 @@
     "start": "npm run start --workspace frontend",
     "lint": "npm run lint --workspace frontend",
     "db:wipe": "tsx backend/scripts/wipe-neon.ts",
-    "db:reset-admin": "tsx backend/scripts/reset-admin-password.ts"
+    "db:reset-admin": "tsx backend/scripts/reset-admin-password.ts",
+    "db:renumber-invoices": "tsx backend/scripts/migrate-invoice-numbers.ts"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

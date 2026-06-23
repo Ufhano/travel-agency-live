@@ -107,7 +107,7 @@ export default async function ClientInvoicePage({
         </p>
       )}
 
-      <InvoicePrintBody ctx={ctx} variant={type} />
+      <InvoicePrintBody ctx={ctx} variant={type} terms={app.invoiceTerms} />
     </div>
   );
 }

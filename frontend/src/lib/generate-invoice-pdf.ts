@@ -65,6 +65,9 @@ export async function generateInvoicePdfBlob(
           cloned.style.height = "auto";
           cloned.style.maxWidth = "none";
           cloned.style.boxShadow = "none";
+          // Drop screen-only controls (e.g. the inline "Edit terms" button) so
+          // they never appear in the captured PDF.
+          cloned.querySelectorAll(".no-print").forEach((el) => el.remove());
         }
         clonedDoc.querySelectorAll("img").forEach((img) => {
           const el = img as HTMLImageElement;

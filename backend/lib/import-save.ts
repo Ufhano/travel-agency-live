@@ -1,6 +1,7 @@
 import {randomBytes} from 'node:crypto';
 
 import {sanitizeIsoYear} from './date-year';
+import {nextInvoiceNumber} from './invoice-number';
 import type {ImportExtractResult} from './import-parse';
 
 type SqlExecutor = (
@@ -110,11 +111,7 @@ export async function saveImportExtractToNeon(
     for (let i = 0; i < installments.length; i++) {
       const inst = installments[i]!;
       const paymentId = id('p');
-      const inv =
-        `IMP-${Date.now()}-${randomBytes(3).toString('hex')}-${i + 1}`.slice(
-          0,
-          120,
-        );
+      const inv = await nextInvoiceNumber(sql, tenantId);
       try {
         await sql`
           INSERT INTO payments (id, tenant_id, invoice_number, client_id, trip_id, amount, paid_at, method, note)
@@ -147,10 +144,7 @@ export async function saveImportExtractToNeon(
   const amt = row.payment.amount;
   if (amt != null && amt > 0) {
     const paymentId = id('p');
-    const baseInv =
-      row.payment.invoiceNumber?.trim() ||
-      `IMP-${Date.now()}-${randomBytes(3).toString('hex')}`;
-    const inv = baseInv.slice(0, 120);
+    const inv = await nextInvoiceNumber(sql, tenantId);
     const method = row.payment.method?.trim() || 'Import';
     const note = row.payment.note?.trim() || null;
     try {
