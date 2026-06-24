@@ -18,8 +18,8 @@ export default async function SettingsPage() {
           users work in their own workspace with limited permissions.
         </p>
       </div>
-      <SettingsInvoiceTermsPanel />
       <SettingsUsersPanel />
+      <SettingsInvoiceTermsPanel />
     </div>
   );
 }
