@@ -83,42 +83,40 @@ export async function generateInvoicePdfBlob(
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // Slice the canvas into page-sized chunks (avoids blank / misaligned pages)
-    const sliceHeightPx = Math.floor((canvas.width * pageHeight) / pageWidth);
-    let offsetY = 0;
-    let pageIndex = 0;
+    // Always render the whole invoice (header, table, terms, signature, footer)
+    // onto a SINGLE A4 page. Fit the capture inside the page while preserving
+    // its aspect ratio, so nothing — especially the signature and terms — ever
+    // spills onto a second page.
+    const imgData = canvas.toDataURL("image/png", 1.0);
+    const canvasRatio = canvas.width / canvas.height;
+    const pageRatio = pageWidth / pageHeight;
 
-    while (offsetY < canvas.height) {
-      const chunkHeight = Math.min(sliceHeightPx, canvas.height - offsetY);
-      const pageCanvas = document.createElement("canvas");
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = chunkHeight;
-      const ctx = pageCanvas.getContext("2d");
-      if (!ctx) throw new Error("Could not create PDF canvas.");
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-      ctx.drawImage(
-        canvas,
-        0,
-        offsetY,
-        canvas.width,
-        chunkHeight,
-        0,
-        0,
-        canvas.width,
-        chunkHeight,
-      );
-
-      const imgData = pageCanvas.toDataURL("image/png", 1.0);
-      const chunkPdfHeight = (chunkHeight * pageWidth) / canvas.width;
-
-      if (pageIndex > 0) pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, 0, pageWidth, chunkPdfHeight, undefined, "FAST");
-
-      offsetY += chunkHeight;
-      pageIndex += 1;
+    let renderWidth: number;
+    let renderHeight: number;
+    if (canvasRatio >= pageRatio) {
+      // Wider than the page proportionally — constrain by width.
+      renderWidth = pageWidth;
+      renderHeight = pageWidth / canvasRatio;
+    } else {
+      // Taller than the page proportionally — constrain by height.
+      renderHeight = pageHeight;
+      renderWidth = pageHeight * canvasRatio;
     }
+
+    // Centre horizontally; pin to the top so the layout reads naturally.
+    const offsetX = (pageWidth - renderWidth) / 2;
+    const offsetY = 0;
+
+    pdf.addImage(
+      imgData,
+      "PNG",
+      offsetX,
+      offsetY,
+      renderWidth,
+      renderHeight,
+      undefined,
+      "FAST",
+    );
 
     return pdf.output("blob") as Blob;
   } finally {

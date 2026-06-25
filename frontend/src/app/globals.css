@@ -107,7 +107,47 @@
   }
 
   @page {
-    margin: 1.2cm;
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  /**
+   * Keep the whole invoice on a single page. Compress the generous on-screen
+   * spacing so the header, table, terms and signature all fit within one A4
+   * sheet, and never break across pages.
+   */
+  #invoice-print {
+    overflow: hidden !important;
+  }
+
+  #invoice-print .invoice-print-inner {
+    padding: 0 !important;
+  }
+
+  /* Tighten the large vertical rhythm used for screen so print fits one page. */
+  #invoice-print .mt-10 {
+    margin-top: 1rem !important;
+  }
+  #invoice-print .mt-8 {
+    margin-top: 0.75rem !important;
+  }
+  #invoice-print .pt-8,
+  #invoice-print .pt-6 {
+    padding-top: 0.75rem !important;
+  }
+  #invoice-print .pb-10 {
+    padding-bottom: 0 !important;
+  }
+  #invoice-print .gap-8 {
+    gap: 1rem !important;
+  }
+
+  /* Terms + signature + footer must stay together and never split. */
+  #invoice-print .invoice-footer-group,
+  #invoice-print .invoice-signature,
+  #invoice-print .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   #invoice-print .invoice-table {
