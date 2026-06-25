@@ -7,6 +7,7 @@ import { InvoiceToolbar } from "@/components/invoice-toolbar";
 import { DbConnectionBanner } from "@/components/db-connection-banner";
 
 import { createCompute } from "@backend/compute";
+import { resolveInvoiceTermsForTrip } from "@backend/invoice-terms";
 
 import { loadAppDataForPage } from "@/lib/page-data";
 
@@ -68,7 +69,15 @@ export default async function InvoiceDetailPage({
 
       />
 
-      <InvoicePrintBody ctx={ctx} terms={app.invoiceTerms} />
+      <InvoicePrintBody
+        ctx={ctx}
+        terms={resolveInvoiceTermsForTrip(
+          app.invoiceTermsConfig,
+          ctx.trip.id,
+        )}
+        tripId={ctx.trip.id}
+        tripLabel={ctx.trip.name}
+      />
 
     </div>
 

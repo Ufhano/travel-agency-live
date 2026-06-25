@@ -1,7 +1,11 @@
 import { trips, clients, payments } from "./data";
 import { sanitizeIsoYear } from "./date-year";
 import { getSql } from "./db";
-import { DEFAULT_INVOICE_TERMS, getInvoiceTerms } from "./invoice-terms";
+import {
+  defaultInvoiceTermsConfig,
+  getInvoiceTermsConfig,
+  type InvoiceTermsConfig,
+} from "./invoice-terms";
 import { tripTenantById } from "./tenant-scope";
 import type { AppData } from "./app-data";
 import type { Client, Payment, Trip, TripStatus } from "./types";
@@ -12,7 +16,10 @@ export type LoadAppDataResult = {
   dbError?: string;
 };
 
-function memoryFallback(tenantId: string, invoiceTerms: string[]): AppData {
+function memoryFallback(
+  tenantId: string,
+  invoiceTermsConfig: InvoiceTermsConfig,
+): AppData {
   const tenantTripIds = new Set(
     trips
       .filter((t) => tripTenantById.get(t.id) === tenantId)
@@ -26,7 +33,7 @@ function memoryFallback(tenantId: string, invoiceTerms: string[]): AppData {
     payments: payments.filter(
       (p) => tenantTripIds.has(p.tripId) && tenantClientIds.has(p.clientId),
     ),
-    invoiceTerms,
+    invoiceTermsConfig,
   };
 }
 
@@ -34,12 +41,13 @@ function memoryFallback(tenantId: string, invoiceTerms: string[]): AppData {
 export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> {
   const sql = getSql();
   if (!sql) {
-    const invoiceTerms = await getInvoiceTerms(undefined, tenantId);
-    return { data: memoryFallback(tenantId, invoiceTerms) };
+    const invoiceTermsConfig = await getInvoiceTermsConfig(undefined, tenantId);
+    return { data: memoryFallback(tenantId, invoiceTermsConfig) };
   }
 
   try {
-    const [tripRows, clientRows, paymentRows, invoiceTerms] = await Promise.all([
+    const [tripRows, clientRows, paymentRows, invoiceTermsConfig] =
+      await Promise.all([
       sql`
         SELECT id, name, destination, departure_date, capacity, status, accommodation_note
         FROM trips
@@ -57,7 +65,7 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
         WHERE tenant_id = ${tenantId}
         ORDER BY paid_at ASC
       `,
-      getInvoiceTerms(sql, tenantId),
+      getInvoiceTermsConfig(sql, tenantId),
     ]);
 
     const mappedTrips: Trip[] = (tripRows as TripRow[]).map((row) => ({
@@ -99,14 +107,14 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
         trips: mappedTrips,
         clients: mappedClients,
         payments: mappedPayments,
-        invoiceTerms,
+        invoiceTermsConfig,
       },
     };
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     console.error("[loadAppData] Neon query failed:", detail);
     return {
-      data: memoryFallback(tenantId, [...DEFAULT_INVOICE_TERMS]),
+      data: memoryFallback(tenantId, defaultInvoiceTermsConfig()),
       dbError:
         "Could not connect to Neon. Check DATABASE_URL in frontend/.env.local, wake the project in the Neon dashboard, and try removing channel_binding=require from the connection string. Visit /api/db-health for details.",
     };
