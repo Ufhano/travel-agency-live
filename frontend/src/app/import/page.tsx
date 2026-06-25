@@ -91,16 +91,16 @@ const IMPORT_OPTIONS: readonly {
     title: 'Spreadsheet',
     description: 'CSV or Excel (.csv, .xlsx, .xls) with header row',
   },
-  {
-    value: 'pdf',
-    title: 'PDF',
-    description: 'Payment or receipt PDF (text-based extract)',
-  },
-  {
-    value: 'word',
-    title: 'Word document',
-    description: '.docx export — legacy .doc is not supported',
-  },
+  // {
+  //   value: 'pdf',
+  //   title: 'PDF',
+  //   description: 'Payment or receipt PDF (text-based extract)',
+  // },
+  // {
+  //   value: 'word',
+  //   title: 'Word document',
+  //   description: '.docx export — legacy .doc is not supported',
+  // },
 ];
 
 export default function ImportPage() {

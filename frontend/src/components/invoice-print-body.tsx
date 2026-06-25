@@ -66,12 +66,16 @@ export function InvoicePrintBody({
   ctx,
   variant = 'payment',
   terms,
+  tripId,
+  tripLabel,
 }: {
   ctx: PaymentWithContext;
   /** `payment` = single receipt. `partial` / `full` = client statement. */
   variant?: 'payment' | 'partial' | 'full';
-  /** Per-tenant Terms & Conditions lines; falls back to the default template. */
+  /** Terms & Conditions lines for this trip; falls back to the default template. */
   terms?: string[];
+  tripId?: string;
+  tripLabel?: string;
 }) {
   const termsList =
     terms && terms.length > 0 ? terms : DEFAULT_INVOICE_TERMS;
@@ -286,7 +290,11 @@ export function InvoicePrintBody({
         </div>
 
         {/* Terms — editable inline; saves workspace-wide via the settings API. */}
-        <InvoiceTermsSection initialTerms={termsList} />
+        <InvoiceTermsSection
+          initialTerms={termsList}
+          tripId={tripId}
+          tripLabel={tripLabel}
+        />
 
         <div className='mt-10 flex flex-wrap items-end gap-x-10 gap-y-4 border-t border-slate-200 pt-6 text-sm print:border-black/20'>
           <div className='min-w-[12rem] flex-1'>
