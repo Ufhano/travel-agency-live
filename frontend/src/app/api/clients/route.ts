@@ -62,8 +62,8 @@ function parseClientUpsertFields(body: NewClientInput):
 
   if (!tripId) return { ok: false, error: "Trip is required." };
   if (!fullName) return { ok: false, error: "Full name is required." };
-  if (!email || !EMAIL_RE.test(email))
-    return { ok: false, error: "A valid email is required." };
+  if (email && !EMAIL_RE.test(email))
+    return { ok: false, error: "Enter a valid email, or leave it blank." };
   if (!Number.isFinite(priceRaw) || priceRaw <= 0)
     return { ok: false, error: "Package price must be a positive number." };
   if (!ISO_DATE_RE.test(balanceDueDate))
