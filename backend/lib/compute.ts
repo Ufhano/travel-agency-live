@@ -17,6 +17,7 @@ export type TripCompute = {
   getClientsOnTrip(tripId: string): Client[];
   paymentsForClient(clientId: string): Payment[];
   totalPaidForClient(clientId: string): number;
+  netPriceForClient(client: Client): number;
   balanceForClient(client: Client): number;
   clientPaymentStatus(client: Client): ClientPaymentStatus;
   enrichPayment(payment: Payment): PaymentWithContext | undefined;
@@ -74,8 +75,13 @@ export function createCompute(data: AppData): TripCompute {
     return paymentsForClient(clientId).reduce((s, p) => s + p.amount, 0);
   }
 
+  /** Package price after subtracting the manual discount (never below zero). */
+  function netPriceForClient(client: Client): number {
+    return Math.max(0, client.packagePrice - (client.discount ?? 0));
+  }
+
   function balanceForClient(client: Client): number {
-    return Math.max(0, client.packagePrice - totalPaidForClient(client.id));
+    return Math.max(0, netPriceForClient(client) - totalPaidForClient(client.id));
   }
 
   function clientPaymentStatus(client: Client): ClientPaymentStatus {
@@ -84,7 +90,7 @@ export function createCompute(data: AppData): TripCompute {
     if (bal <= 0) return "Paid in Full";
     if (client.balanceDueDate < asOfDate && bal > 0) return "Overdue";
     if (paid <= 0) return "Partial Payment";
-    if (paid < client.packagePrice * 0.35) return "Deposit Paid";
+    if (paid < netPriceForClient(client) * 0.35) return "Deposit Paid";
     return "Partial Payment";
   }
 
@@ -95,15 +101,16 @@ export function createCompute(data: AppData): TripCompute {
     const trip = getTrip(payment.tripId);
     if (!client || !trip) return undefined;
 
+    const netPrice = netPriceForClient(client);
     const ordered = paymentsForClient(payment.clientId);
     let cumulative = 0;
     let totalPaidAfter = 0;
-    let balanceAfter = client.packagePrice;
+    let balanceAfter = netPrice;
     for (const p of ordered) {
       cumulative += p.amount;
       if (p.id === payment.id) {
         totalPaidAfter = cumulative;
-        balanceAfter = Math.max(0, client.packagePrice - cumulative);
+        balanceAfter = Math.max(0, netPrice - cumulative);
         break;
       }
     }
@@ -169,7 +176,7 @@ export function createCompute(data: AppData): TripCompute {
     const tripClients = getClientsOnTrip(tripId);
     const confirmedCount = tripClients.length;
     const totalExpectedRevenue = tripClients.reduce(
-      (s, c) => s + c.packagePrice,
+      (s, c) => s + netPriceForClient(c),
       0,
     );
     const totalPaid = tripClients.reduce(
@@ -321,6 +328,7 @@ export function createCompute(data: AppData): TripCompute {
     getClientsOnTrip,
     paymentsForClient,
     totalPaidForClient,
+    netPriceForClient,
     balanceForClient,
     clientPaymentStatus,
     enrichPayment,

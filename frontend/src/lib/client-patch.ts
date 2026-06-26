@@ -8,6 +8,7 @@ export type ClientPatchPayload = {
   email: string;
   idNumber: string | null;
   packagePrice: number;
+  discount: number;
   balanceDueDate: string;
 };
 
@@ -23,6 +24,7 @@ export function clientToPatchPayload(
     email: client.email,
     idNumber: client.idNumber ?? null,
     packagePrice: client.packagePrice,
+    discount: client.discount ?? 0,
     balanceDueDate: client.balanceDueDate,
     ...overrides,
   };

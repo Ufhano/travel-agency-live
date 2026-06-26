@@ -55,7 +55,7 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
         ORDER BY departure_date ASC
       `,
       sql`
-        SELECT id, trip_id, full_name, phone, email, id_number, package_price, balance_due_date
+        SELECT id, trip_id, full_name, phone, email, id_number, package_price, discount, balance_due_date
         FROM clients
         WHERE tenant_id = ${tenantId}
       `,
@@ -86,6 +86,7 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
       email: row.email,
       idNumber: row.id_number?.trim() || null,
       packagePrice: Number(row.package_price),
+      discount: Number(row.discount ?? 0),
       balanceDueDate: isoDateSlice(row.balance_due_date),
     }));
 
@@ -139,6 +140,7 @@ type ClientRow = {
   email: string;
   id_number: string | null;
   package_price: number;
+  discount: number | null;
   balance_due_date: string;
 };
 

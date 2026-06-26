@@ -43,6 +43,7 @@ type FormState = {
   email: string;
   idNumber: string;
   packagePrice: string;
+  discount: string;
   balanceDueDate: string;
 };
 
@@ -56,6 +57,7 @@ function clientToForm(c: Client, trips: Trip[]): FormState {
     email: c.email,
     idNumber: c.idNumber ?? "",
     packagePrice: String(c.packagePrice),
+    discount: c.discount ? String(c.discount) : "",
     balanceDueDate: c.balanceDueDate.slice(0, 10),
   };
 }
@@ -144,6 +146,7 @@ export function EditClientDialog({
           email: form.email,
           idNumber: form.idNumber.trim() || null,
           packagePrice: Number(form.packagePrice),
+          discount: form.discount ? Number(form.discount) : 0,
           balanceDueDate: form.balanceDueDate,
         }),
       });
@@ -309,6 +312,22 @@ export function EditClientDialog({
                     placeholder="12500"
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-client-discount">Discount (ZAR)</Label>
+                  <Input
+                    id="edit-client-discount"
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={form.discount}
+                    onChange={(e) => update("discount", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-client-due">Balance due date</Label>
                   <Input

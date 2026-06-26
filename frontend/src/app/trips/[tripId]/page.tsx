@@ -196,6 +196,7 @@ export default async function TripPage({
                 <TableHead>Client</TableHead>
                 <TableHead className="hidden sm:table-cell">Contact</TableHead>
                 <TableHead className="text-right">Package</TableHead>
+                <TableHead className="text-right">Discount</TableHead>
                 <TableHead className="text-right">Paid</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Status</TableHead>
@@ -222,6 +223,9 @@ export default async function TripPage({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatZAR(c.packagePrice)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {c.discount > 0 ? `− ${formatZAR(c.discount)}` : "—"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-emerald-800 dark:text-emerald-300">
                       {formatZAR(paid)}

@@ -22,6 +22,7 @@ type NewClientInput = {
   email?: unknown;
   idNumber?: unknown;
   packagePrice?: unknown;
+  discount?: unknown;
   balanceDueDate?: unknown;
 };
 
@@ -32,6 +33,7 @@ type ClientUpsertFields = {
   email: string;
   idNumber: string | null;
   packagePrice: number;
+  discount: number;
   balanceDueDate: string;
 };
 
@@ -59,6 +61,12 @@ function parseClientUpsertFields(body: NewClientInput):
     typeof body.packagePrice === "number"
       ? body.packagePrice
       : Number(asString(body.packagePrice));
+  const discountRaw =
+    body.discount == null || body.discount === ""
+      ? 0
+      : typeof body.discount === "number"
+        ? body.discount
+        : Number(asString(body.discount));
 
   if (!tripId) return { ok: false, error: "Trip is required." };
   if (!fullName) return { ok: false, error: "Full name is required." };
@@ -66,6 +74,10 @@ function parseClientUpsertFields(body: NewClientInput):
     return { ok: false, error: "Enter a valid email, or leave it blank." };
   if (!Number.isFinite(priceRaw) || priceRaw <= 0)
     return { ok: false, error: "Package price must be a positive number." };
+  if (!Number.isFinite(discountRaw) || discountRaw < 0)
+    return { ok: false, error: "Discount must be zero or a positive number." };
+  if (discountRaw > priceRaw)
+    return { ok: false, error: "Discount cannot be larger than the package price." };
   if (!ISO_DATE_RE.test(balanceDueDate))
     return {
       ok: false,
@@ -81,6 +93,7 @@ function parseClientUpsertFields(body: NewClientInput):
       email,
       idNumber,
       packagePrice: Math.round(priceRaw),
+      discount: Math.round(discountRaw),
       balanceDueDate,
     },
   };
@@ -106,7 +119,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const parsed = parseClientUpsertFields(body);
   if (!parsed.ok) return badRequest(parsed.error);
-  const { tripId, fullName, phone, email, idNumber, packagePrice, balanceDueDate } =
+  const { tripId, fullName, phone, email, idNumber, packagePrice, discount, balanceDueDate } =
     parsed.fields;
   const id = `c-${randomUUID()}`;
 
@@ -118,6 +131,7 @@ export async function POST(request: Request): Promise<Response> {
     email,
     idNumber,
     packagePrice,
+    discount,
     balanceDueDate,
   };
 
@@ -140,9 +154,9 @@ export async function POST(request: Request): Promise<Response> {
 
     await sql`
       INSERT INTO clients
-        (id, tenant_id, trip_id, full_name, phone, email, id_number, package_price, balance_due_date)
+        (id, tenant_id, trip_id, full_name, phone, email, id_number, package_price, discount, balance_due_date)
       VALUES
-        (${id}, ${session.tenantId}, ${tripId}, ${fullName}, ${phone}, ${email}, ${idNumber}, ${packagePrice}, ${balanceDueDate})
+        (${id}, ${session.tenantId}, ${tripId}, ${fullName}, ${phone}, ${email}, ${idNumber}, ${packagePrice}, ${discount}, ${balanceDueDate})
     `;
 
     return NextResponse.json({ ok: true, client: newClient }, { status: 201 });
@@ -178,7 +192,7 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const parsed = parseClientUpsertFields(body);
   if (!parsed.ok) return badRequest(parsed.error);
-  const { tripId, fullName, phone, email, idNumber, packagePrice, balanceDueDate } =
+  const { tripId, fullName, phone, email, idNumber, packagePrice, discount, balanceDueDate } =
     parsed.fields;
 
   const sql = getSql();
@@ -204,6 +218,7 @@ export async function PATCH(request: Request): Promise<Response> {
       email,
       idNumber,
       packagePrice,
+      discount,
       balanceDueDate,
     };
     memoryClients[ix] = updated;
@@ -241,6 +256,7 @@ export async function PATCH(request: Request): Promise<Response> {
         email = ${email},
         id_number = ${idNumber},
         package_price = ${packagePrice},
+        discount = ${discount},
         balance_due_date = ${balanceDueDate}
       WHERE id = ${clientId} AND tenant_id = ${session.tenantId}
     `;
@@ -261,6 +277,7 @@ export async function PATCH(request: Request): Promise<Response> {
       email,
       idNumber,
       packagePrice,
+      discount,
       balanceDueDate,
     };
 
