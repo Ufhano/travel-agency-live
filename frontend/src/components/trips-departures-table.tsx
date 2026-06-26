@@ -14,6 +14,7 @@ import {
 import { InlineTripDateCell } from "@/components/inline-trip-date-cell";
 import { TableSearchInput } from "@/components/table-search-input";
 import { TripStatusBadge } from "@/components/trip-status-badge";
+import { DeleteTripButton } from "@/components/delete-trip-button";
 import { matchesSearch } from "@/lib/search-utils";
 import { formatDate, formatZAR } from "@/lib/utils";
 
@@ -75,13 +76,16 @@ export function TripsDeparturesTable({ rows }: Props) {
               <TableHead className="hidden sm:table-cell text-right">Travellers</TableHead>
               <TableHead className="text-right">Outstanding</TableHead>
               <TableHead className="hidden lg:table-cell">Status</TableHead>
+              <TableHead className="w-[56px] text-right">
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
                   No trips yet. Use the form above to create your first departure.
@@ -90,7 +94,7 @@ export function TripsDeparturesTable({ rows }: Props) {
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
                   No trips match your search.
@@ -122,6 +126,13 @@ export function TripsDeparturesTable({ rows }: Props) {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <TripStatusBadge status={row.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DeleteTripButton
+                      tripId={row.tripId}
+                      tripName={row.tripName}
+                      travellerCount={row.confirmedCount}
+                    />
                   </TableCell>
                 </TableRow>
               ))

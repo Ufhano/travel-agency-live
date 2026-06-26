@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getSql } from "@backend/db";
-import { trips as memoryTrips } from "@backend/data";
+import {
+  clients as memoryClients,
+  payments as memoryPayments,
+  trips as memoryTrips,
+} from "@backend/data";
 import { memoryTripBelongsToTenant } from "@backend/tenant-access";
 import { createTripInNeon, parseCreateTripInput } from "@backend/trip-save";
 import { parseUpdateTripInput, updateTripInNeon } from "@backend/trip-update";
@@ -152,6 +156,70 @@ export async function PATCH(request: Request): Promise<Response> {
     const message = e instanceof Error ? e.message : "Unknown database error.";
     return NextResponse.json(
       { error: `Failed to update trip: ${message}` },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * `DELETE /api/trips?tripId=…` — remove a departure and everything linked to it
+ * (travellers, payments and group bookings cascade via foreign keys).
+ */
+export async function DELETE(request: Request): Promise<Response> {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const tripId = searchParams.get("tripId")?.trim() ?? "";
+  if (!tripId) {
+    return NextResponse.json({ error: "tripId is required." }, { status: 400 });
+  }
+
+  const sql = getSql();
+
+  if (!sql) {
+    if (!memoryTripBelongsToTenant(tripId, session.tenantId)) {
+      return NextResponse.json({ error: "Trip not found." }, { status: 404 });
+    }
+    const ix = memoryTrips.findIndex((t) => t.id === tripId);
+    if (ix === -1) {
+      return NextResponse.json({ error: "Trip not found." }, { status: 404 });
+    }
+    const removedClientIds = new Set(
+      memoryClients.filter((c) => c.tripId === tripId).map((c) => c.id),
+    );
+    for (let i = memoryPayments.length - 1; i >= 0; i--) {
+      if (
+        memoryPayments[i]!.tripId === tripId ||
+        removedClientIds.has(memoryPayments[i]!.clientId)
+      ) {
+        memoryPayments.splice(i, 1);
+      }
+    }
+    for (let i = memoryClients.length - 1; i >= 0; i--) {
+      if (memoryClients[i]!.tripId === tripId) memoryClients.splice(i, 1);
+    }
+    memoryTrips.splice(ix, 1);
+    return NextResponse.json({ ok: true });
+  }
+
+  try {
+    const rows = (await sql`
+      DELETE FROM trips
+      WHERE id = ${tripId} AND tenant_id = ${session.tenantId}
+      RETURNING id
+    `) as Array<{ id: string }>;
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Trip not found." }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("[api/trips DELETE]", e);
+    const message = e instanceof Error ? e.message : "Unknown database error.";
+    return NextResponse.json(
+      { error: `Failed to delete trip: ${message}` },
       { status: 500 },
     );
   }
