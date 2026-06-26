@@ -271,10 +271,9 @@ export function EditClientDialog({
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-client-email">Email</Label>
+                  <Label htmlFor="edit-client-email">Email (optional)</Label>
                   <Input
                     id="edit-client-email"
-                    required
                     type="email"
                     autoComplete="email"
                     value={form.email}
