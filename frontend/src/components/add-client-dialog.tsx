@@ -32,6 +32,7 @@ type FormState = {
   phone: string;
   email: string;
   packagePrice: string;
+  discount: string;
   balanceDueDate: string;
 };
 
@@ -41,6 +42,7 @@ const emptyForm = (defaultTripId: string): FormState => ({
   phone: "",
   email: "",
   packagePrice: "",
+  discount: "",
   balanceDueDate: "",
 });
 
@@ -121,6 +123,7 @@ export function AddClientDialog({
           phone: form.phone,
           email: form.email,
           packagePrice: Number(form.packagePrice),
+          discount: form.discount ? Number(form.discount) : 0,
           balanceDueDate: form.balanceDueDate,
         }),
       });
@@ -269,6 +272,22 @@ export function AddClientDialog({
                   placeholder="12500"
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="add-client-discount">Discount (ZAR)</Label>
+                <Input
+                  id="add-client-discount"
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  value={form.discount}
+                  onChange={(e) => update("discount", e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="add-client-due">Balance due date</Label>
                 <Input

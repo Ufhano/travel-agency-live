@@ -8,6 +8,7 @@
     "start": "npm run start --workspace frontend",
     "lint": "npm run lint --workspace frontend",
     "db:wipe": "tsx backend/scripts/wipe-neon.ts",
+    "db:migrate": "tsx backend/scripts/apply-migration.ts",
     "db:reset-admin": "tsx backend/scripts/reset-admin-password.ts",
     "db:renumber-invoices": "tsx backend/scripts/migrate-invoice-numbers.ts"
   },

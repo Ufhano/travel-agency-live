@@ -32,6 +32,8 @@ export interface Client {
   /** National ID / passport number — optional, entered manually. */
   idNumber: string | null;
   packagePrice: number;
+  /** Manual discount in ZAR subtracted from the package price (defaults to 0). */
+  discount: number;
   /** ISO date — balance considered overdue after this if not paid in full. */
   balanceDueDate: string;
 }

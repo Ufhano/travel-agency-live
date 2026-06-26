@@ -26,6 +26,7 @@ export default async function ClientInvoicePage({
     enrichPayment,
     getClient,
     getTrip,
+    netPriceForClient,
     paymentsForClient,
     totalPaidForClient,
   } = createCompute(app);
@@ -36,6 +37,7 @@ export default async function ClientInvoicePage({
   if (!trip) notFound();
 
   const balance = balanceForClient(client);
+  const netPrice = netPriceForClient(client);
   const paid = totalPaidForClient(client.id);
   const payments = paymentsForClient(client.id);
 
@@ -55,8 +57,8 @@ export default async function ClientInvoicePage({
     ? {
         ...enriched,
         invoiceNumber,
-        amount: type === "full" ? client.packagePrice : paid,
-        totalPaidAfter: type === "full" ? client.packagePrice : paid,
+        amount: type === "full" ? netPrice : paid,
+        totalPaidAfter: type === "full" ? netPrice : paid,
         balanceAfter: type === "full" ? 0 : balance,
       }
     : {
@@ -64,16 +66,16 @@ export default async function ClientInvoicePage({
         invoiceNumber,
         clientId: client.id,
         tripId: trip.id,
-        amount: type === "full" ? client.packagePrice : paid,
+        amount: type === "full" ? netPrice : paid,
         paidAt: new Date().toISOString(),
         method: "Statement",
         client,
         trip,
-        totalPaidAfter: type === "full" ? client.packagePrice : paid,
+        totalPaidAfter: type === "full" ? netPrice : paid,
         balanceAfter: type === "full" ? 0 : balance,
       };
 
-  const toolbarAmount = type === "full" ? client.packagePrice : paid;
+  const toolbarAmount = type === "full" ? netPrice : paid;
   const toolbarBalance = type === "full" ? 0 : balance;
   const paymentIdForEmail = latest?.id ?? "";
 

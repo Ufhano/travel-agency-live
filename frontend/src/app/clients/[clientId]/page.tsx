@@ -103,6 +103,12 @@ export default async function ClientPage({
               </p>
             </div>
             <div>
+              <p className="text-muted-foreground">Discount</p>
+              <p className="text-lg font-semibold tabular-nums text-muted-foreground">
+                {client.discount > 0 ? `− ${formatZAR(client.discount)}` : "—"}
+              </p>
+            </div>
+            <div>
               <p className="text-muted-foreground">Total paid</p>
               <p className="text-lg font-semibold tabular-nums text-emerald-800 dark:text-emerald-300">
                 {formatZAR(paid)}

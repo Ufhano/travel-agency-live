@@ -82,9 +82,13 @@ export function InvoicePrintBody({
   const desc = packageDescription(ctx);
   const packageHeader = packageColumnHeader(ctx);
   const contactLine = clientContactLine(ctx);
+  const netPrice = Math.max(
+    0,
+    ctx.client.packagePrice - (ctx.client.discount ?? 0),
+  );
   const paid =
     variant === 'full'
-      ? ctx.client.packagePrice
+      ? netPrice
       : variant === 'partial'
         ? ctx.totalPaidAfter
         : ctx.amount;
@@ -279,7 +283,7 @@ export function InvoicePrintBody({
                   1
                 </td>
                 <td className='invoice-col-total border-r border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
-                  {formatZARInvoice(ctx.client.packagePrice)}
+                  {formatZARInvoice(netPrice)}
                 </td>
                 <td className='invoice-col-outstanding border-t border-black px-2 py-3 sm:px-3 tabular-nums whitespace-nowrap'>
                   {formatZARInvoice(balance)}

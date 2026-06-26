@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS clients (
   email TEXT NOT NULL,
   id_number TEXT,
   package_price INTEGER NOT NULL,
+  discount INTEGER NOT NULL DEFAULT 0,
   balance_due_date DATE NOT NULL
 );
 
