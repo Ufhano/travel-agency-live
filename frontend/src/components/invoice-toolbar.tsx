@@ -15,22 +15,11 @@ import {
   generateInvoicePdfBlob,
   invoicePdfFilename,
 } from "@/lib/generate-invoice-pdf";
+import { printInvoice } from "@/lib/invoice-print";
 import { formatZAR, hasRealClientEmail } from "@/lib/utils";
 import { DeleteInvoiceButton } from "@/components/delete-invoice-button";
 
 /** Print the on-screen invoice so PDF matches the live layout (styles, logo, fonts). */
-function printInvoice(invoiceNumber: string) {
-  const originalTitle = document.title;
-  document.title = `Invoice ${invoiceNumber}`;
-
-  const restore = () => {
-    document.title = originalTitle;
-    window.removeEventListener("afterprint", restore);
-  };
-  window.addEventListener("afterprint", restore);
-  window.print();
-}
-
 function whatsAppPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("27")) return digits;

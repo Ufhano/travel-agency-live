@@ -164,7 +164,7 @@ export function InvoicePrintBody({
 
           <div className='flex flex-col items-stretch gap-4 lg:items-end'>
             <div
-              className='print-color-exact self-end px-6 py-3 text-center text-base font-bold tracking-[0.12em] text-white sm:px-10 sm:text-xl sm:tracking-[0.2em]'
+              className='print-color-exact self-end px-10 py-3 text-center text-xl font-bold tracking-[0.2em] text-white'
               style={{backgroundColor: TEAL_DEEP}}
             >
               {ribbonLabel}
@@ -293,44 +293,41 @@ export function InvoicePrintBody({
           </table>
         </div>
 
-        {/* Terms + signature + footer are kept together so the signature and
-            terms never split or leak onto a second page. */}
-        <div className='invoice-footer-group break-inside-avoid'>
-          {/* Terms — editable inline; saves workspace-wide via the settings API. */}
-          <InvoiceTermsSection
-            initialTerms={termsList}
-            tripId={tripId}
-            tripLabel={tripLabel}
-          />
+        <div className='invoice-footer-group'>
+        <InvoiceTermsSection
+          initialTerms={termsList}
+          tripId={tripId}
+          tripLabel={tripLabel}
+        />
 
-          <div className='invoice-signature break-inside-avoid mt-10 flex flex-wrap items-end gap-x-10 gap-y-4 border-t border-slate-200 pt-6 text-sm print:border-black/20'>
-            <div className='min-w-[12rem] flex-1'>
-              <p className='font-semibold' style={{color: TEAL_DEEP}}>
-                Signature:
-              </p>
-              <div className='relative mt-1 h-14 w-48 max-w-full overflow-hidden sm:h-16 sm:w-56'>
-                <Image
-                  src='/nendila-signature.png'
-                  alt='Authorised signature'
-                  fill
-                  className='object-contain object-left'
-                  sizes='224px'
-                />
-              </div>
-            </div>
-            <p>
-              <span className='font-semibold' style={{color: TEAL_DEEP}}>
-                Date:
-              </span>
-              <span className='ml-2 tabular-nums'>
-                <InvoiceTodayDate />
-              </span>
+        <div className='invoice-signature mt-10 flex flex-wrap items-end gap-x-10 gap-y-4 border-t border-slate-200 pt-6 text-sm print:border-black/20'>
+          <div className='min-w-[12rem] flex-1'>
+            <p className='font-semibold' style={{color: TEAL_DEEP}}>
+              Signature:
             </p>
+            <div className='relative mt-1 h-14 w-48 max-w-full overflow-hidden sm:h-16 sm:w-56'>
+              <Image
+                src='/nendila-signature.png'
+                alt='Authorised signature'
+                fill
+                className='object-contain object-left'
+                sizes='224px'
+              />
+            </div>
           </div>
-
-          <p className='mt-8 text-center text-[11px] text-slate-500 print:text-slate-600'>
-            Nendila Travel & Explorers,thank you for travelling with us.
+          <p>
+            <span className='font-semibold' style={{color: TEAL_DEEP}}>
+              Date:
+            </span>
+            <span className='ml-2 tabular-nums'>
+              <InvoiceTodayDate />
+            </span>
           </p>
+        </div>
+
+        <p className='mt-8 text-center text-[11px] text-slate-500 print:text-slate-600'>
+          Nendila Travel & Explorers,thank you for travelling with us.
+        </p>
         </div>
       </div>
     </div>

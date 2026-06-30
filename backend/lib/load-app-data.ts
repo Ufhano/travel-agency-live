@@ -37,6 +37,21 @@ function memoryFallback(
   };
 }
 
+function isTransientDbError(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  return (
+    msg.includes("fetch failed") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("socket") ||
+    msg.includes("network")
+  );
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
 /** Neon when `DATABASE_URL` is set; otherwise typed empty fallback from `data.ts`. */
 export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> {
   const sql = getSql();
@@ -45,9 +60,11 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
     return { data: memoryFallback(tenantId, invoiceTermsConfig) };
   }
 
-  try {
-    const [tripRows, clientRows, paymentRows, invoiceTermsConfig] =
-      await Promise.all([
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const [tripRows, clientRows, paymentRows, invoiceTermsConfig] =
+        await Promise.all([
       sql`
         SELECT id, name, destination, departure_date, capacity, status, accommodation_note
         FROM trips
@@ -111,15 +128,31 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
         invoiceTermsConfig,
       },
     };
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
-    console.error("[loadAppData] Neon query failed:", detail);
-    return {
-      data: memoryFallback(tenantId, defaultInvoiceTermsConfig()),
-      dbError:
-        "Could not connect to Neon. Check DATABASE_URL in frontend/.env.local, wake the project in the Neon dashboard, and try removing channel_binding=require from the connection string. Visit /api/db-health for details.",
-    };
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      const retryable =
+        attempt < maxAttempts && isTransientDbError(e);
+      if (retryable) {
+        console.warn(
+          `[loadAppData] Neon attempt ${attempt}/${maxAttempts} failed (${detail}) — retrying…`,
+        );
+        await sleep(800 * attempt);
+        continue;
+      }
+      console.error("[loadAppData] Neon query failed:", detail);
+      return {
+        data: memoryFallback(tenantId, defaultInvoiceTermsConfig()),
+        dbError:
+          "Could not connect to Neon. Check DATABASE_URL in frontend/.env.local, wake the project in the Neon dashboard, and try removing channel_binding=require from the connection string. Visit /api/db-health for details.",
+      };
+    }
   }
+
+  return {
+    data: memoryFallback(tenantId, defaultInvoiceTermsConfig()),
+    dbError:
+      "Could not connect to Neon after several attempts. Run npm run db:test from the repo root.",
+  };
 }
 
 type TripRow = {

@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/db-health",
   "/manifest.json",
   "/sw.js",
 ];
