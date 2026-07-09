@@ -266,8 +266,8 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
           <div>
             <CardTitle className="text-base">Passenger split</CardTitle>
             <CardDescription>
-              Enter each passenger&apos;s name, email, and share of the group
-              payment.
+              Enter each passenger&apos;s name and share of the group payment.
+              Email is optional.
             </CardDescription>
           </div>
           <Button
@@ -304,12 +304,11 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
                 <Input
                   id={`email-${p.key}`}
                   type="email"
-                  placeholder="name@example.com"
+                  placeholder="name@example.com (optional)"
                   value={p.passengerEmail}
                   onChange={(e) =>
                     updatePassenger(p.key, "passengerEmail", e.target.value)
                   }
-                  required
                 />
               </div>
               <div className="space-y-1.5">
