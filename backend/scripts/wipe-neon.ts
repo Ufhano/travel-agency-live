@@ -6,6 +6,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { neon } from "@neondatabase/serverless";
+import { normalizeDatabaseUrl } from "../lib/db";
 
 function loadEnvLocal() {
   const root = resolve(process.cwd());
@@ -42,7 +43,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = neon(normalizeDatabaseUrl(url));
 
 async function main() {
   console.log("Truncating payments → clients → trips on Neon …");

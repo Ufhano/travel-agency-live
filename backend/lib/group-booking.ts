@@ -160,7 +160,7 @@ export function parseCreateGroupBookingFormData(
     if (!passengerName) {
       return { ok: false, error: `Passenger ${i + 1} needs a name.` };
     }
-    if (!passengerEmail || !EMAIL_RE.test(passengerEmail)) {
+    if (passengerEmail && !EMAIL_RE.test(passengerEmail)) {
       return { ok: false, error: `Passenger ${i + 1} needs a valid email.` };
     }
     if (!Number.isFinite(amount) || amount <= 0) {

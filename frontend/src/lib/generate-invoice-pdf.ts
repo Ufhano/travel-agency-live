@@ -1,3 +1,9 @@
+import {
+  applyInvoiceOnePageLayout,
+  clearInvoiceOnePageLayout,
+  PAGE_MARGIN_MM,
+} from "./invoice-print";
+
 /** Wait for all images inside the invoice to finish loading. */
 function waitForImages(root: HTMLElement): Promise<void> {
   const imgs = [...root.querySelectorAll("img")];
@@ -15,6 +21,18 @@ function waitForImages(root: HTMLElement): Promise<void> {
   ).then(() => undefined);
 }
 
+const CAPTURE_WIDTH_PX = 896;
+
+function measureInvoiceHeight(node: HTMLElement): number {
+  const top = node.getBoundingClientRect().top;
+  let bottom = node.scrollHeight;
+  const footer = node.querySelector(".invoice-footer-group");
+  if (footer) {
+    bottom = Math.max(bottom, footer.getBoundingClientRect().bottom - top);
+  }
+  return Math.ceil(bottom + 4);
+}
+
 /** Build a PDF blob from the on-screen invoice (#invoice-print). */
 export async function generateInvoicePdfBlob(
   _invoiceNumber: string,
@@ -22,29 +40,33 @@ export async function generateInvoicePdfBlob(
   const node = document.getElementById("invoice-print");
   if (!node) throw new Error("Invoice not found on page.");
 
-  // Remember the user's scroll position so we can restore it after capture.
   const prevScrollX = window.scrollX;
   const prevScrollY = window.scrollY;
+  const prevWidth = node.style.width;
+  const prevMaxWidth = node.style.maxWidth;
+  const prevOverflow = node.style.overflow;
+  const prevHeight = node.style.height;
 
   node.scrollIntoView({ block: "start" });
   await document.fonts.ready;
   await waitForImages(node);
-  // Allow layout to settle after scroll
-  await new Promise((r) => setTimeout(r, 150));
 
-  const prevOverflow = node.style.overflow;
-  const prevHeight = node.style.height;
+  applyInvoiceOnePageLayout();
+  node.style.width = `${CAPTURE_WIDTH_PX}px`;
+  node.style.maxWidth = `${CAPTURE_WIDTH_PX}px`;
   node.style.overflow = "visible";
   node.style.height = "auto";
 
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise((r) => setTimeout(r, 150));
+
   try {
+    const captureHeight = measureInvoiceHeight(node);
+
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import("html2canvas"),
       import("jspdf"),
     ]);
-
-    const width = node.scrollWidth;
-    const height = node.scrollHeight;
 
     const canvas = await html2canvas(node, {
       scale: 2,
@@ -52,21 +74,21 @@ export async function generateInvoicePdfBlob(
       allowTaint: true,
       logging: false,
       backgroundColor: "#ffffff",
-      width,
-      height,
-      windowWidth: width,
-      windowHeight: height,
+      width: CAPTURE_WIDTH_PX,
+      height: captureHeight,
+      windowWidth: CAPTURE_WIDTH_PX,
+      windowHeight: captureHeight,
       scrollX: 0,
-      scrollY: -window.scrollY,
+      scrollY: 0,
       onclone: (clonedDoc) => {
         const cloned = clonedDoc.getElementById("invoice-print");
         if (cloned) {
+          cloned.classList.add("invoice-one-page");
           cloned.style.overflow = "visible";
           cloned.style.height = "auto";
-          cloned.style.maxWidth = "none";
+          cloned.style.width = `${CAPTURE_WIDTH_PX}px`;
+          cloned.style.maxWidth = `${CAPTURE_WIDTH_PX}px`;
           cloned.style.boxShadow = "none";
-          // Drop screen-only controls (e.g. the inline "Edit terms" button) so
-          // they never appear in the captured PDF.
           cloned.querySelectorAll(".no-print").forEach((el) => el.remove());
         }
         clonedDoc.querySelectorAll("img").forEach((img) => {
@@ -82,36 +104,21 @@ export async function generateInvoicePdfBlob(
     const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
+    const innerWidth = pageWidth - PAGE_MARGIN_MM * 2;
+    const innerHeight = pageHeight - PAGE_MARGIN_MM * 2;
 
-    // Always render the whole invoice (header, table, terms, signature, footer)
-    // onto a SINGLE A4 page. Fit the capture inside the page while preserving
-    // its aspect ratio, so nothing — especially the signature and terms — ever
-    // spills onto a second page.
     const imgData = canvas.toDataURL("image/png", 1.0);
-    const canvasRatio = canvas.width / canvas.height;
-    const pageRatio = pageWidth / pageHeight;
-
-    let renderWidth: number;
-    let renderHeight: number;
-    if (canvasRatio >= pageRatio) {
-      // Wider than the page proportionally — constrain by width.
-      renderWidth = pageWidth;
-      renderHeight = pageWidth / canvasRatio;
-    } else {
-      // Taller than the page proportionally — constrain by height.
-      renderHeight = pageHeight;
-      renderWidth = pageHeight * canvasRatio;
-    }
-
-    // Centre horizontally; pin to the top so the layout reads naturally.
-    const offsetX = (pageWidth - renderWidth) / 2;
-    const offsetY = 0;
+    const aspect = canvas.height / canvas.width;
+    const naturalHeightMm = innerWidth * aspect;
+    const scale = Math.min(1, innerHeight / naturalHeightMm);
+    const renderWidth = innerWidth * scale;
+    const renderHeight = naturalHeightMm * scale;
 
     pdf.addImage(
       imgData,
       "PNG",
-      offsetX,
-      offsetY,
+      PAGE_MARGIN_MM + (innerWidth - renderWidth) / 2,
+      PAGE_MARGIN_MM,
       renderWidth,
       renderHeight,
       undefined,
@@ -120,9 +127,11 @@ export async function generateInvoicePdfBlob(
 
     return pdf.output("blob") as Blob;
   } finally {
+    clearInvoiceOnePageLayout();
+    node.style.width = prevWidth;
+    node.style.maxWidth = prevMaxWidth;
     node.style.overflow = prevOverflow;
     node.style.height = prevHeight;
-    // Return the user to where they were before the capture scrolled the page.
     window.scrollTo(prevScrollX, prevScrollY);
   }
 }

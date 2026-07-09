@@ -164,7 +164,11 @@ export function InvoiceTermsSection({
   }
 
   return (
-    <section className="relative mt-10 break-inside-avoid border border-slate-200 bg-slate-50/80 p-5 sm:p-6 print:border-black/20 print:bg-white">
+    <section
+      className={`invoice-terms relative mt-10 break-inside-avoid border border-slate-200 bg-slate-50/80 p-5 sm:p-6 print:border-black/20 print:bg-white${
+        terms.length > 10 ? " invoice-terms-many" : ""
+      }`}
+    >
       <h2
         className="text-center text-sm font-bold uppercase tracking-wide sm:text-base"
         style={{ color: TEAL_DEEP }}
