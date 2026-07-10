@@ -90,6 +90,7 @@ export interface KeyOperationalInsight {
 
 export type GroupBookingStatus = "Pending" | "Partial" | "Complete";
 
+/** @deprecated Use amountPaid vs packagePrice instead. */
 export type PassengerPaidStatus = "unpaid" | "paid";
 
 export interface GroupBooking {
@@ -110,9 +111,23 @@ export interface GroupBookingPassenger {
   groupBookingId: string;
   passengerName: string;
   passengerEmail: string;
-  amount: number;
-  paidStatus: PassengerPaidStatus;
+  /** Share of the group lump-sum payment credited to this passenger. */
+  allocatedAmount: number;
+  /** Full trip package price for this passenger. */
+  packagePrice: number;
+  /** Cumulative amount paid (includes initial allocation). */
+  amountPaid: number;
   createdAt: string;
+}
+
+export interface GroupBookingPassengerPayment {
+  id: string;
+  passengerId: string;
+  amount: number;
+  paidAt: string;
+  note?: string;
+  createdAt: string;
+  proofFileName?: string;
 }
 
 export interface GroupBookingWithPassengers extends GroupBooking {
@@ -124,4 +139,15 @@ export interface GroupBookingWithPassengers extends GroupBooking {
 export interface GroupBookingListItem extends GroupBooking {
   tripName: string;
   passengerCount: number;
+}
+
+/** Group-split passenger shown on a trip departure page. */
+export interface TripGroupSplitPassenger {
+  id: string;
+  groupBookingId: string;
+  referenceNumber: string;
+  passengerName: string;
+  passengerEmail: string;
+  packagePrice: number;
+  amountPaid: number;
 }

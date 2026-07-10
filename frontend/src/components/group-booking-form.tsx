@@ -37,13 +37,20 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function GroupBookingForm({ trips }: { trips: Trip[] }) {
+export function GroupBookingForm({
+  trips,
+  packageHintByTrip = {},
+}: {
+  trips: Trip[];
+  packageHintByTrip?: Record<string, number>;
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [tripId, setTripId] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
+  const [packagePricePerPerson, setPackagePricePerPerson] = useState("");
   const [paidAt, setPaidAt] = useState(todayIsoDate);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [passengers, setPassengers] = useState<PassengerDraft[]>([
@@ -68,10 +75,20 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
   }, [passengers]);
 
   const totalNum = Number(totalAmount);
+  const packageNum = Number(packagePricePerPerson);
   const totalsMatch =
     Number.isFinite(totalNum) &&
     totalNum > 0 &&
     allocationSum === Math.round(totalNum);
+  const packageValid = Number.isFinite(packageNum) && packageNum > 0;
+
+  function onTripChange(nextTripId: string) {
+    setTripId(nextTripId);
+    const hint = packageHintByTrip[nextTripId];
+    if (hint && hint > 0) {
+      setPackagePricePerPerson(String(hint));
+    }
+  }
 
   function addPassenger() {
     setPassengers((prev) => [
@@ -127,6 +144,10 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
       toast("Enter a valid total amount.", "error");
       return;
     }
+    if (!packageValid) {
+      toast("Enter a valid package price per person.", "error");
+      return;
+    }
     if (!totalsMatch) {
       toast(
         `Passenger amounts (${formatZAR(allocationSum)}) must equal total (${formatZAR(Math.round(totalNum))}).`,
@@ -140,6 +161,7 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
       const body = new FormData();
       body.set("tripId", tripId);
       body.set("totalAmount", String(Math.round(totalNum)));
+      body.set("packagePricePerPerson", String(Math.round(packageNum)));
       body.set("paidAt", paidAt);
       body.set(
         "passengers",
@@ -186,8 +208,8 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
         <CardHeader>
           <CardTitle className="text-base">Trip &amp; total payment</CardTitle>
           <CardDescription>
-            Select the departure and enter the bulk payment received from the
-            group.
+            Select the departure, enter the bulk group payment received, and the
+            full package price per person.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -197,7 +219,7 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
               id="tripId"
               className={selectClassName}
               value={tripId}
-              onChange={(e) => setTripId(e.target.value)}
+              onChange={(e) => onTripChange(e.target.value)}
               required
             >
               <option value="">Choose a departure…</option>
@@ -209,7 +231,21 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="totalAmount">Total amount</Label>
+            <Label htmlFor="packagePricePerPerson">Package price per person</Label>
+            <Input
+              id="packagePricePerPerson"
+              type="number"
+              min={1}
+              step={1}
+              className="tabular-nums"
+              placeholder="e.g. 10000"
+              value={packagePricePerPerson}
+              onChange={(e) => setPackagePricePerPerson(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="totalAmount">Group payment received</Label>
             <Input
               id="totalAmount"
               type="number"
@@ -266,8 +302,8 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
           <div>
             <CardTitle className="text-base">Passenger split</CardTitle>
             <CardDescription>
-              Enter each passenger&apos;s name and share of the group payment.
-              Email is optional.
+              Enter each passenger&apos;s share of the group payment. Amounts must
+              add up to the group payment total. Email is optional.
             </CardDescription>
           </div>
           <Button
@@ -364,7 +400,11 @@ export function GroupBookingForm({ trips }: { trips: Trip[] }) {
       <Button
         type="submit"
         disabled={
-          submitting || !totalsMatch || sortedTrips.length === 0 || !proofFile
+          submitting ||
+          !totalsMatch ||
+          !packageValid ||
+          sortedTrips.length === 0 ||
+          !proofFile
         }
         className="gap-2"
       >

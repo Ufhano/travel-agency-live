@@ -6,8 +6,10 @@ import { verifySessionToken } from "@/lib/auth-edge";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/book",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/public",
   "/api/db-health",
   "/manifest.json",
   "/sw.js",

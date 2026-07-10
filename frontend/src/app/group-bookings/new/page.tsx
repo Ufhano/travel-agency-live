@@ -9,6 +9,13 @@ export const dynamic = "force-dynamic";
 export default async function NewGroupBookingPage() {
   const { data, dbError } = await loadAppDataForPage();
 
+  const packageHintByTrip: Record<string, number> = {};
+  for (const client of data.clients) {
+    if (!packageHintByTrip[client.tripId]) {
+      packageHintByTrip[client.tripId] = client.packagePrice;
+    }
+  }
+
   return (
     <div className="space-y-6">
       {dbError ? <DbConnectionBanner message={dbError} /> : null}
@@ -17,18 +24,19 @@ export default async function NewGroupBookingPage() {
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to group bookings
+        Back to group split
       </Link>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          New group fare split
+          New group split
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Enter the total group payment and allocate each passenger&apos;s share.
-          Amounts must add up exactly before you can submit.
+          Enter the group payment received, the full package price per person, and
+          each passenger&apos;s share of the group payment. Amounts must add up
+          exactly before you can submit.
         </p>
       </div>
-      <GroupBookingForm trips={data.trips} />
+      <GroupBookingForm trips={data.trips} packageHintByTrip={packageHintByTrip} />
     </div>
   );
 }

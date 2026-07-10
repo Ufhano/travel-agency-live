@@ -161,6 +161,42 @@ export async function insertGroupBookingDocument(
   return { id: docId };
 }
 
+export async function insertGroupBookingPassengerPaymentDocument(
+  sql: SqlExecutor,
+  tenantId: string,
+  groupBookingId: string,
+  passengerPaymentId: string,
+  title: string,
+  fileName: string,
+  buffer: Buffer,
+): Promise<{ id: string }> {
+  await ensureGroupBookingDocumentsSchema(sql);
+  const docId = id("gbdoc");
+  await sql`
+    INSERT INTO group_booking_documents (
+      id,
+      tenant_id,
+      group_booking_id,
+      passenger_payment_id,
+      title,
+      file_name,
+      content_type,
+      file_data
+    )
+    VALUES (
+      ${docId},
+      ${tenantId},
+      ${groupBookingId},
+      ${passengerPaymentId},
+      ${title},
+      ${fileName},
+      ${PDF_MIME},
+      ${buffer}
+    )
+  `;
+  return { id: docId };
+}
+
 export async function getGroupBookingProofDocument(
   sql: SqlExecutor,
   tenantId: string,
@@ -174,7 +210,46 @@ export async function getGroupBookingProofDocument(
   const rows = (await sql`
     SELECT file_name, content_type, file_data
     FROM group_booking_documents
-    WHERE group_booking_id = ${groupBookingId} AND tenant_id = ${tenantId}
+    WHERE group_booking_id = ${groupBookingId}
+      AND tenant_id = ${tenantId}
+      AND passenger_payment_id IS NULL
+    ORDER BY uploaded_at DESC
+    LIMIT 1
+  `) as {
+    file_name: string;
+    content_type: string;
+    file_data: Buffer | Uint8Array;
+  }[];
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const buffer = Buffer.isBuffer(row.file_data)
+    ? row.file_data
+    : Buffer.from(row.file_data);
+
+  return {
+    fileName: row.file_name,
+    contentType: row.content_type || PDF_MIME,
+    buffer,
+  };
+}
+
+export async function getGroupBookingPassengerPaymentProofDocument(
+  sql: SqlExecutor,
+  tenantId: string,
+  passengerPaymentId: string,
+): Promise<{
+  fileName: string;
+  contentType: string;
+  buffer: Buffer;
+} | null> {
+  await ensureGroupBookingDocumentsSchema(sql);
+  const rows = (await sql`
+    SELECT file_name, content_type, file_data
+    FROM group_booking_documents
+    WHERE passenger_payment_id = ${passengerPaymentId}
+      AND tenant_id = ${tenantId}
     ORDER BY uploaded_at DESC
     LIMIT 1
   `) as {

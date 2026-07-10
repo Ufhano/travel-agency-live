@@ -29,7 +29,11 @@ CREATE TABLE IF NOT EXISTS trips (
   departure_date DATE NOT NULL,
   capacity INTEGER NOT NULL,
   status TEXT NOT NULL,
-  accommodation_note TEXT NOT NULL
+  accommodation_note TEXT NOT NULL,
+  is_featured BOOLEAN NOT NULL DEFAULT false,
+  public_package_price INTEGER,
+  hero_image_url TEXT,
+  gallery_urls JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
 CREATE INDEX IF NOT EXISTS idx_trips_tenant ON trips (tenant_id);
@@ -44,11 +48,17 @@ CREATE TABLE IF NOT EXISTS clients (
   id_number TEXT,
   package_price INTEGER NOT NULL,
   discount INTEGER NOT NULL DEFAULT 0,
-  balance_due_date DATE NOT NULL
+  balance_due_date DATE NOT NULL,
+  booking_status TEXT NOT NULL DEFAULT 'confirmed',
+  yoco_checkout_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_clients_trip ON clients (trip_id);
 CREATE INDEX IF NOT EXISTS idx_clients_tenant ON clients (tenant_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_yoco_checkout_id
+  ON clients (yoco_checkout_id)
+  WHERE yoco_checkout_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS payments (
   id TEXT PRIMARY KEY,
@@ -59,12 +69,22 @@ CREATE TABLE IF NOT EXISTS payments (
   amount INTEGER NOT NULL,
   paid_at TIMESTAMPTZ NOT NULL,
   method TEXT NOT NULL,
-  note TEXT
+  note TEXT,
+  external_ref TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_payments_client ON payments (client_id);
 CREATE INDEX IF NOT EXISTS idx_payments_trip ON payments (trip_id);
 CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments (tenant_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_external_ref
+  ON payments (external_ref)
+  WHERE external_ref IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS yoco_webhook_events (
+  id TEXT PRIMARY KEY,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS group_bookings (
   id TEXT PRIMARY KEY,
@@ -89,9 +109,27 @@ CREATE TABLE IF NOT EXISTS group_booking_passengers (
   passenger_name TEXT NOT NULL,
   passenger_email TEXT NOT NULL,
   amount INTEGER NOT NULL,
+  package_price INTEGER NOT NULL,
+  amount_paid INTEGER NOT NULL DEFAULT 0,
   paid_status TEXT NOT NULL DEFAULT 'unpaid',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS group_booking_passenger_payments (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+  passenger_id TEXT NOT NULL REFERENCES group_booking_passengers (id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  paid_at DATE NOT NULL,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_gb_passenger_payments_passenger
+  ON group_booking_passenger_payments (passenger_id);
+
+CREATE INDEX IF NOT EXISTS idx_gb_passenger_payments_tenant
+  ON group_booking_passenger_payments (tenant_id);
 
 CREATE INDEX IF NOT EXISTS idx_group_booking_passengers_booking
   ON group_booking_passengers (group_booking_id);
@@ -100,12 +138,16 @@ CREATE TABLE IF NOT EXISTS group_booking_documents (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
   group_booking_id TEXT NOT NULL REFERENCES group_bookings (id) ON DELETE CASCADE,
+  passenger_payment_id TEXT REFERENCES group_booking_passenger_payments (id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   file_name TEXT NOT NULL,
   content_type TEXT NOT NULL DEFAULT 'application/pdf',
   file_data BYTEA NOT NULL,
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_group_booking_documents_payment
+  ON group_booking_documents (passenger_payment_id);
 
 CREATE INDEX IF NOT EXISTS idx_group_booking_documents_booking
   ON group_booking_documents (group_booking_id);

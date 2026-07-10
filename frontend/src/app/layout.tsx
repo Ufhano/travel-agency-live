@@ -1,6 +1,6 @@
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
-import {AppShell} from '@/components/app-shell';
+import {LayoutRouter} from '@/components/layout-router';
 import {ServiceWorkerRegister} from '@/components/sw-register';
 import {ToastProvider} from '@/components/ui/toast';
 import {isAuthEnabled} from '@/lib/auth-config';
@@ -51,9 +51,9 @@ export default async function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans`}>
         <ServiceWorkerRegister />
         <ToastProvider>
-          <AppShell authEnabled={isAuthEnabled()} session={clientSession}>
+          <LayoutRouter authEnabled={isAuthEnabled()} session={clientSession}>
             {children}
-          </AppShell>
+          </LayoutRouter>
         </ToastProvider>
       </body>
     </html>

@@ -114,6 +114,43 @@ async function main() {
   `;
   await sql`ALTER TABLE group_bookings DROP COLUMN IF EXISTS currency`;
 
+  await sql`
+    ALTER TABLE group_booking_passengers
+    ADD COLUMN IF NOT EXISTS package_price INTEGER
+  `;
+  await sql`
+    ALTER TABLE group_booking_passengers
+    ADD COLUMN IF NOT EXISTS amount_paid INTEGER NOT NULL DEFAULT 0
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS group_booking_passenger_payments (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+      passenger_id TEXT NOT NULL REFERENCES group_booking_passengers (id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      paid_at DATE NOT NULL,
+      note TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_gb_passenger_payments_passenger
+      ON group_booking_passenger_payments (passenger_id)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_gb_passenger_payments_tenant
+      ON group_booking_passenger_payments (tenant_id)
+  `;
+  await sql`
+    ALTER TABLE group_booking_documents
+    ADD COLUMN IF NOT EXISTS passenger_payment_id TEXT
+    REFERENCES group_booking_passenger_payments (id) ON DELETE CASCADE
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_group_booking_documents_payment
+      ON group_booking_documents (passenger_payment_id)
+  `;
+
   console.log("OK: group_bookings tables are ready.");
 }
 
