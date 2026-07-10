@@ -10,6 +10,7 @@ import {
   LogOut,
   MapPin,
   Settings,
+  Split,
   Upload,
   Users,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import type { ClientSession } from "@/lib/session-token";
 const baseNav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/group-bookings", label: "Group Split", icon: Split },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/trips", label: "Trips", icon: MapPin },
 ];

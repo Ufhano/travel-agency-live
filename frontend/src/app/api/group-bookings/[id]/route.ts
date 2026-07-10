@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getGroupBookingById } from "@backend/group-booking";
+import { getGroupBookingById, listGroupBookingFollowUpPayments } from "@backend/group-booking";
 import { getSql } from "@backend/db";
 import { getSession } from "@/lib/auth-server";
 
@@ -35,7 +35,12 @@ export async function GET(
     if (!groupBooking) {
       return NextResponse.json({ error: "Group booking not found." }, { status: 404 });
     }
-    return NextResponse.json({ groupBooking });
+    const followUpPayments = await listGroupBookingFollowUpPayments(
+      sql,
+      session.tenantId,
+      id,
+    );
+    return NextResponse.json({ groupBooking, followUpPayments });
   } catch (e) {
     console.error("[api/group-bookings/[id] GET]", e);
     const message = e instanceof Error ? e.message : "Unknown database error.";

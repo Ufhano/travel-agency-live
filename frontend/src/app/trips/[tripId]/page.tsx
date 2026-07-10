@@ -26,8 +26,14 @@ import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button
 import { AddClientDialog } from "@/components/add-client-dialog";
 import { InlineTripDateCell } from "@/components/inline-trip-date-cell";
 import { createCompute } from "@backend/compute";
+import { getSql } from "@backend/db";
+import {
+  listTripGroupSplitPassengers,
+  passengerBalance,
+} from "@backend/group-booking";
 import { loadAppDataForPage } from "@/lib/page-data";
 import { formatZAR } from "@/lib/utils";
+import { GroupSplitBadge } from "@/components/group-split-badge";
 
 export default async function TripPage({
   params,
@@ -35,7 +41,7 @@ export default async function TripPage({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const { data, dbError } = await loadAppDataForPage();
+  const { data, dbError, session } = await loadAppDataForPage();
   const {
     aggregateTrip,
     balanceForClient,
@@ -45,7 +51,37 @@ export default async function TripPage({
   const agg = aggregateTrip(tripId);
   if (!agg) notFound();
 
-  const status = displayTripStatus(agg.trip, agg);
+  const sql = getSql();
+  const groupSplitPassengers =
+    sql != null
+      ? await listTripGroupSplitPassengers(sql, session.tenantId, tripId)
+      : [];
+
+  const gsExpected = groupSplitPassengers.reduce((s, p) => s + p.packagePrice, 0);
+  const gsPaid = groupSplitPassengers.reduce((s, p) => s + p.amountPaid, 0);
+  const gsOutstanding = groupSplitPassengers.reduce(
+    (s, p) => s + passengerBalance(p),
+    0,
+  );
+
+  const totalExpectedRevenue = agg.totalExpectedRevenue + gsExpected;
+  const totalPaid = agg.totalPaid + gsPaid;
+  const outstanding = agg.outstanding + gsOutstanding;
+  const confirmedCount = agg.confirmedCount + groupSplitPassengers.length;
+  const fillRatio =
+    agg.trip.capacity > 0 ? confirmedCount / agg.trip.capacity : 0;
+  const { transportSuggestion, planningHeadline } = createCompute(
+    data,
+  ).transportAndPlanning(agg.trip, confirmedCount);
+
+  const status = displayTripStatus(agg.trip, {
+    ...agg,
+    confirmedCount,
+    totalExpectedRevenue,
+    totalPaid,
+    outstanding,
+    fillRatio,
+  });
 
   const tripOptions = data.trips.map((t) => ({
     id: t.id,
@@ -92,19 +128,19 @@ export default async function TripPage({
             <div>
               <p className="text-muted-foreground">Total amount to be paid</p>
               <p className="font-semibold tabular-nums">
-                {formatZAR(agg.totalExpectedRevenue)}
+                {formatZAR(totalExpectedRevenue)}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Amount paid</p>
               <p className="font-semibold tabular-nums text-emerald-800 dark:text-emerald-300">
-                {formatZAR(agg.totalPaid)}
+                {formatZAR(totalPaid)}
               </p>
             </div>
             <div className="col-span-2">
               <p className="text-muted-foreground">Outstanding amount</p>
               <p className="text-lg font-bold tabular-nums">
-                {formatZAR(agg.outstanding)}
+                {formatZAR(outstanding)}
               </p>
             </div>
           </CardContent>
@@ -124,13 +160,13 @@ export default async function TripPage({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-baseline justify-between">
-              <span className="text-3xl font-bold">{agg.confirmedCount}</span>
+              <span className="text-3xl font-bold">{confirmedCount}</span>
               <span className="text-muted-foreground">
                 / {agg.trip.capacity} seats
               </span>
             </div>
-            <Progress value={agg.fillRatio * 100} />
-            <p className="text-sm text-muted-foreground">{agg.planningHeadline}</p>
+            <Progress value={fillRatio * 100} />
+            <p className="text-sm text-muted-foreground">{planningHeadline}</p>
           </CardContent>
         </Card>
 
@@ -146,7 +182,7 @@ export default async function TripPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm leading-relaxed">{agg.transportSuggestion}</p>
+            <p className="text-sm leading-relaxed">{transportSuggestion}</p>
             <Separator className="my-4" />
             <div className="flex gap-2">
               <BedDouble className="h-5 w-5 shrink-0 text-muted-foreground" />
@@ -176,7 +212,7 @@ export default async function TripPage({
               lockTrip
               triggerLabel="Add person"
             />
-            {agg.clients.length > 0 ? (
+            {agg.clients.length + groupSplitPassengers.length > 0 ? (
               <DeleteClientsBulkButton
                 mode={{
                   kind: "trip",
@@ -244,6 +280,44 @@ export default async function TripPage({
                         variant="ghost"
                       />
                     </TableCell>
+                  </TableRow>
+                );
+              })}
+              {groupSplitPassengers.map((p) => {
+                const bal = passengerBalance(p);
+                return (
+                  <TableRow key={`gs-${p.id}`}>
+                    <TableCell>
+                      <Link
+                        href={`/group-bookings/${p.groupBookingId}`}
+                        className="inline-flex items-center font-medium text-primary hover:underline"
+                      >
+                        {p.passengerName}
+                        <GroupSplitBadge />
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        {p.referenceNumber}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+                      <div className="text-xs">{p.passengerEmail || "—"}</div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatZAR(p.packagePrice)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      —
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-emerald-800 dark:text-emerald-300">
+                      {formatZAR(p.amountPaid)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {formatZAR(bal)}
+                    </TableCell>
+                    <TableCell>
+                      <ClientFullyPaidBadge balance={bal} />
+                    </TableCell>
+                    <TableCell />
                   </TableRow>
                 );
               })}

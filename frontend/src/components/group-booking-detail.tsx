@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,11 +20,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
+import { RecordGroupSplitPaymentForm } from "@/components/record-group-split-payment-form";
 import { formatDate, formatZAR } from "@/lib/utils";
 import type {
+  GroupBookingPassenger,
+  GroupBookingPassengerPayment,
   GroupBookingStatus,
   GroupBookingWithPassengers,
-  PassengerPaidStatus,
 } from "@backend/types";
 
 function statusBadgeVariant(
@@ -35,12 +38,21 @@ function statusBadgeVariant(
   return "warning";
 }
 
+function passengerBalance(passenger: GroupBookingPassenger): number {
+  return Math.max(0, passenger.packagePrice - passenger.amountPaid);
+}
+
 export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string }) {
   const [groupBooking, setGroupBooking] =
     useState<GroupBookingWithPassengers | null>(null);
+  const [followUpPayments, setFollowUpPayments] = useState<
+    GroupBookingPassengerPayment[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [expandedPassengerId, setExpandedPassengerId] = useState<string | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,12 +61,14 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
       const res = await fetch(`/api/group-bookings/${groupBookingId}`);
       const json = (await res.json()) as {
         groupBooking?: GroupBookingWithPassengers;
+        followUpPayments?: GroupBookingPassengerPayment[];
         error?: string;
       };
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to load group booking.");
       }
       setGroupBooking(json.groupBooking ?? null);
+      setFollowUpPayments(json.followUpPayments ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load group booking.");
     } finally {
@@ -65,49 +79,6 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function togglePaid(
-    passengerId: string,
-    current: PassengerPaidStatus,
-  ) {
-    const next: PassengerPaidStatus = current === "paid" ? "unpaid" : "paid";
-    setUpdatingId(passengerId);
-    try {
-      const res = await fetch(
-        `/api/group-bookings/${groupBookingId}/passengers/${passengerId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paidStatus: next }),
-        },
-      );
-      const json = (await res.json()) as {
-        error?: string;
-        passenger?: { id: string; paidStatus: PassengerPaidStatus };
-        groupStatus?: GroupBookingStatus;
-      };
-      if (!res.ok) {
-        throw new Error(json.error ?? "Could not update passenger.");
-      }
-
-      setGroupBooking((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          status: json.groupStatus ?? prev.status,
-          passengers: prev.passengers.map((p) =>
-            p.id === passengerId
-              ? { ...p, paidStatus: json.passenger?.paidStatus ?? next }
-              : p,
-          ),
-        };
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update passenger.");
-    } finally {
-      setUpdatingId(null);
-    }
-  }
 
   if (loading) {
     return (
@@ -141,9 +112,16 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
 
   if (!groupBooking) return null;
 
-  const paidCount = groupBooking.passengers.filter(
-    (p) => p.paidStatus === "paid",
+  const fullyPaidCount = groupBooking.passengers.filter(
+    (p) => passengerBalance(p) <= 0,
   ).length;
+
+  const paymentsByPassenger = new Map<string, GroupBookingPassengerPayment[]>();
+  for (const payment of followUpPayments) {
+    const list = paymentsByPassenger.get(payment.passengerId) ?? [];
+    list.push(payment);
+    paymentsByPassenger.set(payment.passengerId, list);
+  }
 
   return (
     <div className="space-y-6">
@@ -172,10 +150,20 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Group total
+              Group payment received
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
               {formatZAR(groupBooking.totalAmount)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Package per person
+            </p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">
+              {groupBooking.passengers[0]
+                ? formatZAR(groupBooking.passengers[0].packagePrice)
+                : "—"}
             </p>
           </div>
           <div>
@@ -188,15 +176,15 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Passengers paid
+              Fully paid
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
-              {paidCount} / {groupBooking.passengers.length}
+              {fullyPaidCount} / {groupBooking.passengers.length}
             </p>
           </div>
-          <div>
+          <div className="sm:col-span-2 lg:col-span-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Proof of payment
+              Initial group proof of payment
             </p>
             {groupBooking.proofFileName ? (
               <Button
@@ -223,72 +211,133 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Passenger allocations</CardTitle>
+          <CardTitle className="text-base">Passengers</CardTitle>
           <CardDescription>
-            Mark each passenger as paid once their individual share has been
-            received.
+            Each passenger&apos;s initial share from the group payment is credited
+            automatically. Record additional payments until their balance is
+            cleared.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 sm:px-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Passenger</TableHead>
-                <TableHead className="hidden sm:table-cell">Email</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[120px] text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groupBooking.passengers.map((p) => {
-                const isPaid = p.paidStatus === "paid";
-                const busy = updatingId === p.id;
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {p.passengerName}
-                      <div className="text-xs text-muted-foreground sm:hidden">
+        <CardContent className="space-y-4 p-4 sm:p-6">
+          {groupBooking.passengers.map((p) => {
+            const balance = passengerBalance(p);
+            const extraPayments = paymentsByPassenger.get(p.id) ?? [];
+            const expanded = expandedPassengerId === p.id;
+
+            return (
+              <div
+                key={p.id}
+                className="rounded-lg border border-border/60 p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{p.passengerName}</p>
+                    {p.passengerEmail ? (
+                      <p className="text-sm text-muted-foreground">
                         {p.passengerEmail}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden text-muted-foreground sm:table-cell">
-                      {p.passengerEmail}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatZAR(p.amount)}
-                    </TableCell>
-                    <TableCell>
-                      {isPaid ? (
-                        <Badge variant="success">Paid</Badge>
-                      ) : (
-                        <Badge variant="warning">Unpaid</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant={isPaid ? "outline" : "default"}
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={busy}
-                        onClick={() => void togglePaid(p.id, p.paidStatus)}
-                      >
-                        {busy ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : isPaid ? (
-                          <XCircle className="h-3.5 w-3.5" />
-                        ) : (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        )}
-                        {isPaid ? "Undo" : "Mark paid"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </p>
+                    ) : null}
+                  </div>
+                  <ClientFullyPaidBadge balance={balance} />
+                </div>
+
+                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Package</p>
+                    <p className="font-semibold tabular-nums">
+                      {formatZAR(p.packagePrice)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Initial share
+                    </p>
+                    <p className="font-semibold tabular-nums">
+                      {formatZAR(p.allocatedAmount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Paid total</p>
+                    <p className="font-semibold tabular-nums text-emerald-800 dark:text-emerald-300">
+                      {formatZAR(p.amountPaid)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Balance</p>
+                    <p className="font-semibold tabular-nums">
+                      {formatZAR(balance)}
+                    </p>
+                  </div>
+                </div>
+
+                {extraPayments.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
+                      Additional payments
+                    </p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead>Proof</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {extraPayments.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell>{formatDate(payment.paidAt)}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatZAR(payment.amount)}
+                            </TableCell>
+                            <TableCell>
+                              {payment.proofFileName ? (
+                                <a
+                                  href={`/api/group-bookings/${groupBookingId}/passengers/${p.id}/payments/${payment.id}/proof`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                  {payment.proofFileName}
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+
+                {balance > 0 ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() =>
+                        setExpandedPassengerId(expanded ? null : p.id)
+                      }
+                    >
+                      {expanded ? "Hide payment form" : "Record payment"}
+                    </Button>
+                    {expanded ? (
+                      <RecordGroupSplitPaymentForm
+                        groupBookingId={groupBookingId}
+                        passengerId={p.id}
+                        passengerName={p.passengerName}
+                        balance={balance}
+                        onRecorded={() => void load()}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
     </div>

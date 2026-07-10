@@ -1,12 +1,17 @@
 import { randomBytes } from "node:crypto";
 
-import { insertGroupBookingDocument } from "./documents";
+import {
+  ensureGroupBookingDocumentsSchema,
+  insertGroupBookingDocument,
+  insertGroupBookingPassengerPaymentDocument,
+} from "./documents";
 import type {
   GroupBookingListItem,
   GroupBookingPassenger,
+  GroupBookingPassengerPayment,
   GroupBookingStatus,
   GroupBookingWithPassengers,
-  PassengerPaidStatus,
+  TripGroupSplitPassenger,
 } from "./types";
 
 type SqlExecutor = (
@@ -32,23 +37,67 @@ function isoDateSlice(value: unknown): string {
   return String(value).slice(0, 10);
 }
 
-function parsePaidStatus(raw: string): PassengerPaidStatus {
-  return raw === "paid" ? "paid" : "unpaid";
-}
-
 function parseGroupStatus(raw: string): GroupBookingStatus {
   if (raw === "Partial" || raw === "Complete") return raw;
   return "Pending";
 }
 
+export function passengerBalance(passenger: {
+  packagePrice: number;
+  amountPaid: number;
+}): number {
+  return Math.max(0, passenger.packagePrice - passenger.amountPaid);
+}
+
 export function computeGroupBookingStatus(
-  passengers: { paidStatus: PassengerPaidStatus }[],
+  passengers: { packagePrice: number; amountPaid: number }[],
 ): GroupBookingStatus {
   if (passengers.length === 0) return "Pending";
-  const paidCount = passengers.filter((p) => p.paidStatus === "paid").length;
-  if (paidCount === 0) return "Pending";
-  if (paidCount === passengers.length) return "Complete";
-  return "Partial";
+  if (passengers.every((p) => passengerBalance(p) <= 0)) return "Complete";
+  if (passengers.some((p) => p.amountPaid > 0)) return "Partial";
+  return "Pending";
+}
+
+export async function ensureGroupBookingBalancesSchema(
+  sql: SqlExecutor,
+): Promise<void> {
+  await ensureGroupBookingDocumentsSchema(sql);
+  await sql`
+    ALTER TABLE group_booking_passengers
+    ADD COLUMN IF NOT EXISTS package_price INTEGER
+  `;
+  await sql`
+    ALTER TABLE group_booking_passengers
+    ADD COLUMN IF NOT EXISTS amount_paid INTEGER NOT NULL DEFAULT 0
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS group_booking_passenger_payments (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+      passenger_id TEXT NOT NULL REFERENCES group_booking_passengers (id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      paid_at DATE NOT NULL,
+      note TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_gb_passenger_payments_passenger
+      ON group_booking_passenger_payments (passenger_id)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_gb_passenger_payments_tenant
+      ON group_booking_passenger_payments (tenant_id)
+  `;
+  await sql`
+    ALTER TABLE group_booking_documents
+    ADD COLUMN IF NOT EXISTS passenger_payment_id TEXT
+    REFERENCES group_booking_passenger_payments (id) ON DELETE CASCADE
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_group_booking_documents_payment
+      ON group_booking_documents (passenger_payment_id)
+  `;
 }
 
 export async function nextGroupBookingReference(
@@ -80,6 +129,7 @@ export type CreateGroupBookingPassengerInput = {
 export type CreateGroupBookingInput = {
   tripId: string;
   totalAmount: number;
+  packagePricePerPerson: number;
   paidAt: string;
   passengers: CreateGroupBookingPassengerInput[];
   proofFileName: string;
@@ -105,6 +155,11 @@ export function parseCreateGroupBookingFormData(
     typeof totalAmountRaw === "string"
       ? Number(totalAmountRaw)
       : Number(totalAmountRaw);
+  const packagePriceRaw = form.get("packagePricePerPerson");
+  const packagePricePerPerson =
+    typeof packagePriceRaw === "string"
+      ? Number(packagePriceRaw)
+      : Number(packagePriceRaw);
   const paidAt =
     typeof form.get("paidAt") === "string"
       ? String(form.get("paidAt")).trim()
@@ -114,6 +169,12 @@ export function parseCreateGroupBookingFormData(
   if (!tripId) return { ok: false, error: "Trip is required." };
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
     return { ok: false, error: "Total amount must be a positive number." };
+  }
+  if (!Number.isFinite(packagePricePerPerson) || packagePricePerPerson <= 0) {
+    return {
+      ok: false,
+      error: "Package price per person must be a positive number.",
+    };
   }
   if (!paidAt || !DATE_RE.test(paidAt)) {
     return { ok: false, error: "Payment date must be YYYY-MM-DD." };
@@ -169,6 +230,12 @@ export function parseCreateGroupBookingFormData(
         error: `Passenger ${i + 1} amount must be positive.`,
       };
     }
+    if (amount > Math.round(packagePricePerPerson)) {
+      return {
+        ok: false,
+        error: `Passenger ${i + 1} allocation cannot exceed the package price.`,
+      };
+    }
 
     passengers.push({
       passengerName,
@@ -191,6 +258,7 @@ export function parseCreateGroupBookingFormData(
     input: {
       tripId,
       totalAmount: roundedTotal,
+      packagePricePerPerson: Math.round(packagePricePerPerson),
       paidAt,
       passengers,
       proofFileName: typedFile.name || "proof.pdf",
@@ -205,16 +273,21 @@ function mapPassengerRow(row: {
   passenger_name: string;
   passenger_email: string;
   amount: number | string;
-  paid_status: string;
+  package_price: number | string | null;
+  amount_paid: number | string | null;
   created_at: unknown;
 }): GroupBookingPassenger {
+  const allocatedAmount = Number(row.amount);
+  const packagePrice = Number(row.package_price ?? row.amount);
+  const amountPaid = Number(row.amount_paid ?? 0);
   return {
     id: row.id,
     groupBookingId: row.group_booking_id,
     passengerName: row.passenger_name,
     passengerEmail: row.passenger_email,
-    amount: Number(row.amount),
-    paidStatus: parsePaidStatus(row.paid_status),
+    allocatedAmount,
+    packagePrice,
+    amountPaid,
     createdAt: isoTimestamp(row.created_at),
   };
 }
@@ -224,6 +297,8 @@ export async function createGroupBooking(
   tenantId: string,
   input: CreateGroupBookingInput,
 ): Promise<CreateGroupBookingResult> {
+  await ensureGroupBookingBalancesSchema(sql);
+
   const tripRows = (await sql`
     SELECT id, name, destination
     FROM trips
@@ -236,14 +311,17 @@ export async function createGroupBooking(
 
   const groupBookingId = id("gb");
   const referenceNumber = await nextGroupBookingReference(sql, tenantId);
-  const status: GroupBookingStatus = "Pending";
 
   const passengerRecords = input.passengers.map((p) => ({
     id: id("gbp"),
     passengerName: p.passengerName,
     passengerEmail: p.passengerEmail,
     amount: p.amount,
+    packagePrice: input.packagePricePerPerson,
+    amountPaid: p.amount,
   }));
+
+  const status = computeGroupBookingStatus(passengerRecords);
 
   const txQueries = [
     sql`
@@ -263,7 +341,16 @@ export async function createGroupBooking(
     ...passengerRecords.map((p) =>
       sql`
         INSERT INTO group_booking_passengers
-          (id, group_booking_id, passenger_name, passenger_email, amount, paid_status)
+          (
+            id,
+            group_booking_id,
+            passenger_name,
+            passenger_email,
+            amount,
+            package_price,
+            amount_paid,
+            paid_status
+          )
         VALUES
           (
             ${p.id},
@@ -271,6 +358,8 @@ export async function createGroupBooking(
             ${p.passengerName},
             ${p.passengerEmail},
             ${p.amount},
+            ${p.packagePrice},
+            ${p.amountPaid},
             ${"unpaid"}
           )
       `,
@@ -294,8 +383,9 @@ export async function createGroupBooking(
     groupBookingId,
     passengerName: p.passengerName,
     passengerEmail: p.passengerEmail,
-    amount: p.amount,
-    paidStatus: "unpaid",
+    allocatedAmount: p.amount,
+    packagePrice: p.packagePrice,
+    amountPaid: p.amountPaid,
     createdAt,
   }));
 
@@ -321,6 +411,8 @@ export async function listGroupBookings(
   sql: SqlExecutor,
   tenantId: string,
 ): Promise<GroupBookingListItem[]> {
+  await ensureGroupBookingBalancesSchema(sql);
+
   const rows = (await sql`
     SELECT
       gb.id,
@@ -363,11 +455,103 @@ export async function listGroupBookings(
   }));
 }
 
+export type TripGroupSplitSummary = {
+  passengerCount: number;
+  totalExpected: number;
+  totalPaid: number;
+  outstanding: number;
+};
+
+export async function summarizeGroupSplitByTrip(
+  sql: SqlExecutor,
+  tenantId: string,
+): Promise<Record<string, TripGroupSplitSummary>> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const rows = (await sql`
+    SELECT
+      gb.trip_id,
+      COUNT(gbp.id)::int AS passenger_count,
+      COALESCE(SUM(COALESCE(gbp.package_price, gbp.amount)), 0)::int AS total_expected,
+      COALESCE(SUM(COALESCE(gbp.amount_paid, 0)), 0)::int AS total_paid
+    FROM group_booking_passengers gbp
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    WHERE gb.tenant_id = ${tenantId}
+    GROUP BY gb.trip_id
+  `) as {
+    trip_id: string;
+    passenger_count: number | string;
+    total_expected: number | string;
+    total_paid: number | string;
+  }[];
+
+  const out: Record<string, TripGroupSplitSummary> = {};
+  for (const row of rows) {
+    const totalExpected = Number(row.total_expected);
+    const totalPaid = Number(row.total_paid);
+    out[row.trip_id] = {
+      passengerCount: Number(row.passenger_count),
+      totalExpected,
+      totalPaid,
+      outstanding: Math.max(0, totalExpected - totalPaid),
+    };
+  }
+  return out;
+}
+
+export async function listTripGroupSplitPassengers(
+  sql: SqlExecutor,
+  tenantId: string,
+  tripId: string,
+): Promise<TripGroupSplitPassenger[]> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const rows = (await sql`
+    SELECT
+      gbp.id,
+      gbp.group_booking_id,
+      gb.reference_number,
+      gbp.passenger_name,
+      gbp.passenger_email,
+      gbp.package_price,
+      gbp.amount,
+      gbp.amount_paid,
+      gbp.created_at
+    FROM group_booking_passengers gbp
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    WHERE gb.trip_id = ${tripId}
+      AND gb.tenant_id = ${tenantId}
+    ORDER BY gbp.created_at ASC
+  `) as {
+    id: string;
+    group_booking_id: string;
+    reference_number: string;
+    passenger_name: string;
+    passenger_email: string;
+    package_price: number | string | null;
+    amount: number | string;
+    amount_paid: number | string | null;
+    created_at: unknown;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    groupBookingId: row.group_booking_id,
+    referenceNumber: row.reference_number,
+    passengerName: row.passenger_name,
+    passengerEmail: row.passenger_email,
+    packagePrice: Number(row.package_price ?? row.amount),
+    amountPaid: Number(row.amount_paid ?? 0),
+  }));
+}
+
 export async function getGroupBookingById(
   sql: SqlExecutor,
   tenantId: string,
   groupBookingId: string,
 ): Promise<GroupBookingWithPassengers | null> {
+  await ensureGroupBookingBalancesSchema(sql);
+
   const bookingRows = (await sql`
     SELECT
       gb.id,
@@ -382,7 +566,9 @@ export async function getGroupBookingById(
       (
         SELECT file_name
         FROM group_booking_documents
-        WHERE group_booking_id = gb.id AND tenant_id = gb.tenant_id
+        WHERE group_booking_id = gb.id
+          AND tenant_id = gb.tenant_id
+          AND passenger_payment_id IS NULL
         ORDER BY uploaded_at DESC
         LIMIT 1
       ) AS proof_file_name
@@ -413,7 +599,8 @@ export async function getGroupBookingById(
       passenger_name,
       passenger_email,
       amount,
-      paid_status,
+      package_price,
+      amount_paid,
       created_at
     FROM group_booking_passengers
     WHERE group_booking_id = ${groupBookingId}
@@ -424,7 +611,8 @@ export async function getGroupBookingById(
     passenger_name: string;
     passenger_email: string;
     amount: number | string;
-    paid_status: string;
+    package_price: number | string | null;
+    amount_paid: number | string | null;
     created_at: unknown;
   }[];
 
@@ -445,37 +633,114 @@ export async function getGroupBookingById(
   };
 }
 
-export type UpdatePassengerPaidStatusResult =
-  | { ok: true; passenger: GroupBookingPassenger; groupStatus: GroupBookingStatus }
-  | { ok: false; error: string };
-
-export async function updatePassengerPaidStatus(
+export async function listPassengerPayments(
   sql: SqlExecutor,
   tenantId: string,
   groupBookingId: string,
   passengerId: string,
-  paidStatus: PassengerPaidStatus,
-): Promise<UpdatePassengerPaidStatusResult> {
-  const bookingRows = (await sql`
-    SELECT id FROM group_bookings
-    WHERE id = ${groupBookingId} AND tenant_id = ${tenantId}
+): Promise<GroupBookingPassengerPayment[]> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const passengerRows = (await sql`
+    SELECT gbp.id
+    FROM group_booking_passengers gbp
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    WHERE gbp.id = ${passengerId}
+      AND gbp.group_booking_id = ${groupBookingId}
+      AND gb.tenant_id = ${tenantId}
     LIMIT 1
   `) as { id: string }[];
-  if (!bookingRows[0]) {
-    return { ok: false, error: "Group booking not found." };
+  if (!passengerRows[0]) return [];
+
+  const rows = (await sql`
+    SELECT
+      p.id,
+      p.passenger_id,
+      p.amount,
+      p.paid_at,
+      p.note,
+      p.created_at,
+      (
+        SELECT file_name
+        FROM group_booking_documents
+        WHERE passenger_payment_id = p.id
+          AND tenant_id = ${tenantId}
+        ORDER BY uploaded_at DESC
+        LIMIT 1
+      ) AS proof_file_name
+    FROM group_booking_passenger_payments p
+    WHERE p.passenger_id = ${passengerId}
+      AND p.tenant_id = ${tenantId}
+    ORDER BY p.paid_at ASC, p.created_at ASC
+  `) as {
+    id: string;
+    passenger_id: string;
+    amount: number | string;
+    paid_at: string | Date;
+    note: string | null;
+    created_at: unknown;
+    proof_file_name: string | null;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    passengerId: row.passenger_id,
+    amount: Number(row.amount),
+    paidAt: isoDateSlice(row.paid_at),
+    note: row.note ?? undefined,
+    createdAt: isoTimestamp(row.created_at),
+    proofFileName: row.proof_file_name ?? undefined,
+  }));
+}
+
+export type RecordPassengerPaymentInput = {
+  amount: number;
+  paidAt: string;
+  note?: string;
+  proofFileName?: string;
+  proofBuffer?: Buffer;
+};
+
+export type RecordPassengerPaymentResult =
+  | {
+      ok: true;
+      passenger: GroupBookingPassenger;
+      payment: GroupBookingPassengerPayment;
+      groupStatus: GroupBookingStatus;
+    }
+  | { ok: false; error: string };
+
+export async function recordPassengerPayment(
+  sql: SqlExecutor,
+  tenantId: string,
+  groupBookingId: string,
+  passengerId: string,
+  input: RecordPassengerPaymentInput,
+): Promise<RecordPassengerPaymentResult> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    return { ok: false, error: "Payment amount must be positive." };
+  }
+  if (!DATE_RE.test(input.paidAt)) {
+    return { ok: false, error: "Payment date must be YYYY-MM-DD." };
   }
 
   const passengerRows = (await sql`
     SELECT
-      id,
-      group_booking_id,
-      passenger_name,
-      passenger_email,
-      amount,
-      paid_status,
-      created_at
-    FROM group_booking_passengers
-    WHERE id = ${passengerId} AND group_booking_id = ${groupBookingId}
+      gbp.id,
+      gbp.group_booking_id,
+      gbp.passenger_name,
+      gbp.passenger_email,
+      gbp.amount,
+      gbp.package_price,
+      gbp.amount_paid,
+      gbp.created_at
+    FROM group_booking_passengers gbp
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    WHERE gbp.id = ${passengerId}
+      AND gbp.group_booking_id = ${groupBookingId}
+      AND gb.tenant_id = ${tenantId}
     LIMIT 1
   `) as {
     id: string;
@@ -483,29 +748,76 @@ export async function updatePassengerPaidStatus(
     passenger_name: string;
     passenger_email: string;
     amount: number | string;
-    paid_status: string;
+    package_price: number | string | null;
+    amount_paid: number | string | null;
     created_at: unknown;
   }[];
 
-  if (!passengerRows[0]) {
+  const row = passengerRows[0];
+  if (!row) {
     return { ok: false, error: "Passenger not found." };
+  }
+
+  const passenger = mapPassengerRow(row);
+  const balance = passengerBalance(passenger);
+  const paymentAmount = Math.round(input.amount);
+
+  if (paymentAmount > balance) {
+    return {
+      ok: false,
+      error: `Payment (${paymentAmount}) exceeds remaining balance (${balance}).`,
+    };
+  }
+
+  const paymentId = id("gbpp");
+  const newAmountPaid = passenger.amountPaid + paymentAmount;
+
+  await sql`
+    INSERT INTO group_booking_passenger_payments
+      (id, tenant_id, passenger_id, amount, paid_at, note)
+    VALUES
+      (
+        ${paymentId},
+        ${tenantId},
+        ${passengerId},
+        ${paymentAmount},
+        ${input.paidAt},
+        ${input.note ?? null}
+      )
+  `;
+
+  if (input.proofBuffer && input.proofFileName) {
+    await insertGroupBookingPassengerPaymentDocument(
+      sql,
+      tenantId,
+      groupBookingId,
+      paymentId,
+      "Group split payment proof",
+      input.proofFileName,
+      input.proofBuffer,
+    );
   }
 
   await sql`
     UPDATE group_booking_passengers
-    SET paid_status = ${paidStatus}
+    SET amount_paid = ${newAmountPaid}
     WHERE id = ${passengerId}
   `;
 
   const allPassengerRows = (await sql`
-    SELECT paid_status
+    SELECT package_price, amount_paid
     FROM group_booking_passengers
     WHERE group_booking_id = ${groupBookingId}
-  `) as { paid_status: string }[];
+  `) as {
+    package_price: number | string | null;
+    amount_paid: number | string | null;
+    amount: number | string;
+  }[];
 
   const groupStatus = computeGroupBookingStatus(
     allPassengerRows.map((r) => ({
-      paidStatus: parsePaidStatus(r.paid_status),
+      packagePrice: Number(r.package_price ?? r.amount),
+      amountPaid: Number(r.amount_paid ?? 0),
     })),
   );
 
@@ -515,10 +827,81 @@ export async function updatePassengerPaidStatus(
     WHERE id = ${groupBookingId}
   `;
 
-  const updated = mapPassengerRow({
-    ...passengerRows[0],
-    paid_status: paidStatus,
-  });
+  const updatedPassenger: GroupBookingPassenger = {
+    ...passenger,
+    amountPaid: newAmountPaid,
+  };
 
-  return { ok: true, passenger: updated, groupStatus };
+  const payment: GroupBookingPassengerPayment = {
+    id: paymentId,
+    passengerId,
+    amount: paymentAmount,
+    paidAt: input.paidAt,
+    note: input.note,
+    createdAt: new Date().toISOString(),
+    proofFileName: input.proofFileName,
+  };
+
+  return {
+    ok: true,
+    passenger: updatedPassenger,
+    payment,
+    groupStatus,
+  };
+}
+
+export async function listGroupBookingFollowUpPayments(
+  sql: SqlExecutor,
+  tenantId: string,
+  groupBookingId: string,
+): Promise<GroupBookingPassengerPayment[]> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const bookingRows = (await sql`
+    SELECT id FROM group_bookings
+    WHERE id = ${groupBookingId} AND tenant_id = ${tenantId}
+    LIMIT 1
+  `) as { id: string }[];
+  if (!bookingRows[0]) return [];
+
+  const rows = (await sql`
+    SELECT
+      p.id,
+      p.passenger_id,
+      p.amount,
+      p.paid_at,
+      p.note,
+      p.created_at,
+      (
+        SELECT file_name
+        FROM group_booking_documents
+        WHERE passenger_payment_id = p.id
+          AND tenant_id = ${tenantId}
+        ORDER BY uploaded_at DESC
+        LIMIT 1
+      ) AS proof_file_name
+    FROM group_booking_passenger_payments p
+    JOIN group_booking_passengers gbp ON gbp.id = p.passenger_id
+    WHERE gbp.group_booking_id = ${groupBookingId}
+      AND p.tenant_id = ${tenantId}
+    ORDER BY p.paid_at ASC, p.created_at ASC
+  `) as {
+    id: string;
+    passenger_id: string;
+    amount: number | string;
+    paid_at: string | Date;
+    note: string | null;
+    created_at: unknown;
+    proof_file_name: string | null;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    passengerId: row.passenger_id,
+    amount: Number(row.amount),
+    paidAt: isoDateSlice(row.paid_at),
+    note: row.note ?? undefined,
+    createdAt: isoTimestamp(row.created_at),
+    proofFileName: row.proof_file_name ?? undefined,
+  }));
 }
