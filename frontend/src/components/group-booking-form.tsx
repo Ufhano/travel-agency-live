@@ -84,7 +84,11 @@ export function GroupBookingForm({
 
   function onTripChange(nextTripId: string) {
     setTripId(nextTripId);
-    const hint = packageHintByTrip[nextTripId];
+    const fromTrip = trips.find((t) => t.id === nextTripId)?.packagePrice;
+    const hint =
+      fromTrip != null && fromTrip > 0
+        ? fromTrip
+        : packageHintByTrip[nextTripId];
     if (hint && hint > 0) {
       setPackagePricePerPerson(String(hint));
     }

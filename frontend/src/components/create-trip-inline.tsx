@@ -12,6 +12,7 @@ export type TripOption = {
   name: string;
   destination: string;
   departureDate: string;
+  packagePrice?: number | null;
 };
 
 type Props = {
@@ -30,6 +31,7 @@ export function CreateTripInline({
     defaultDestination || defaultName,
   );
   const [departureDate, setDepartureDate] = useState("");
+  const [packagePrice, setPackagePrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,15 @@ export function CreateTripInline({
     setError(null);
     setSubmitting(true);
     try {
+      const priceNum = packagePrice.trim() ? Number(packagePrice) : null;
+      if (
+        packagePrice.trim() &&
+        (!Number.isFinite(priceNum) || (priceNum ?? 0) < 0)
+      ) {
+        setError("Package price must be a non-negative number.");
+        setSubmitting(false);
+        return;
+      }
       const res = await fetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,6 +59,8 @@ export function CreateTripInline({
           departureDate: departureDate || undefined,
           capacity: 40,
           status: "Open",
+          packagePrice:
+            priceNum != null && priceNum > 0 ? Math.round(priceNum) : null,
         }),
       });
       const json = (await res.json()) as {
@@ -60,6 +73,10 @@ export function CreateTripInline({
         return;
       }
       onCreated(json.trip);
+      setName(defaultName);
+      setDestination(defaultDestination || defaultName);
+      setDepartureDate("");
+      setPackagePrice("");
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -96,13 +113,26 @@ export function CreateTripInline({
             required
           />
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
+        <div className="space-y-1.5">
           <Label htmlFor="new-trip-date">Departure date (optional)</Label>
           <Input
             id="new-trip-date"
             type="date"
             value={departureDate}
             onChange={(e) => setDepartureDate(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="new-trip-package">Package price (ZAR, optional)</Label>
+          <Input
+            id="new-trip-package"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={packagePrice}
+            onChange={(e) => setPackagePrice(e.target.value)}
+            placeholder="e.g. 12500"
           />
         </div>
       </div>
@@ -127,4 +157,3 @@ export function CreateTripInline({
     </form>
   );
 }
-

@@ -92,6 +92,7 @@ export async function ensureTripsForImportGroups(
       capacity: 40,
       status: "Open",
       accommodationNote: "",
+      packagePrice: null,
     };
 
     const created = await createTripInNeon(sql, tenantId, input);

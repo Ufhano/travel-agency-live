@@ -52,3 +52,33 @@ export async function updateTripDepartureDate(
   }
   return { ok: true };
 }
+
+/** Update the default package price for a departure (whole ZAR, or null to clear). */
+export async function updateTripPackagePrice(
+  tripId: string,
+  packagePrice: number | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (packagePrice != null && (!Number.isFinite(packagePrice) || packagePrice < 0)) {
+    return { ok: false, error: "Package price must be a non-negative number." };
+  }
+
+  const res = await fetch("/api/trips", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: tripId,
+      packagePrice:
+        packagePrice != null && packagePrice > 0
+          ? Math.round(packagePrice)
+          : null,
+    }),
+  });
+  const data = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: data?.error ?? `Failed to save package price (HTTP ${res.status}).`,
+    };
+  }
+  return { ok: true };
+}

@@ -10,6 +10,11 @@ export default async function NewGroupBookingPage() {
   const { data, dbError } = await loadAppDataForPage();
 
   const packageHintByTrip: Record<string, number> = {};
+  for (const trip of data.trips) {
+    if (trip.packagePrice != null && trip.packagePrice > 0) {
+      packageHintByTrip[trip.id] = trip.packagePrice;
+    }
+  }
   for (const client of data.clients) {
     if (!packageHintByTrip[client.tripId]) {
       packageHintByTrip[client.tripId] = client.packagePrice;

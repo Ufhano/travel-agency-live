@@ -25,6 +25,7 @@ import { DeleteClientButton } from "@/components/delete-client-button";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { AddClientDialog } from "@/components/add-client-dialog";
 import { InlineTripDateCell } from "@/components/inline-trip-date-cell";
+import { InlineTripPackagePrice } from "@/components/inline-trip-package-price";
 import { createCompute } from "@backend/compute";
 import { getSql } from "@backend/db";
 import {
@@ -88,6 +89,7 @@ export default async function TripPage({
     name: t.name,
     destination: t.destination,
     departureDate: t.departureDate,
+    packagePrice: t.packagePrice,
   }));
 
   return (
@@ -114,6 +116,13 @@ export default async function TripPage({
               <InlineTripDateCell
                 tripId={agg.trip.id}
                 departureDate={agg.trip.departureDate}
+              />
+            </Badge>
+            <Badge variant="outline" className="gap-1.5 font-normal">
+              <span className="text-muted-foreground">Package</span>
+              <InlineTripPackagePrice
+                tripId={agg.trip.id}
+                packagePrice={agg.trip.packagePrice}
               />
             </Badge>
           </div>

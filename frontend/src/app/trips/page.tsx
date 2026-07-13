@@ -40,6 +40,7 @@ export default async function TripsPage() {
         tripName: trip.name,
         destination: trip.destination,
         departureDate: trip.departureDate,
+        packagePrice: trip.packagePrice,
         confirmedCount,
         capacity: trip.capacity,
         outstanding,
@@ -62,7 +63,8 @@ export default async function TripsPage() {
         <CardHeader>
           <CardTitle className="text-lg">Create a trip</CardTitle>
           <CardDescription>
-            Add a new departure with a name, destination, and optional date.
+            Add a new departure with a name, destination, optional date, and
+            package price.
           </CardDescription>
         </CardHeader>
         <CardContent>

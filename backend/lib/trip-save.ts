@@ -33,6 +33,7 @@ export type CreateTripInput = {
   capacity?: unknown;
   status?: unknown;
   accommodationNote?: unknown;
+  packagePrice?: unknown;
 };
 
 export function parseCreateTripInput(
@@ -69,6 +70,18 @@ export function parseCreateTripInput(
     ? (statusRaw as TripStatus)
     : "Open";
 
+  let packagePrice: number | null = null;
+  if (body.packagePrice !== undefined && body.packagePrice !== null && body.packagePrice !== "") {
+    const priceRaw =
+      typeof body.packagePrice === "number"
+        ? body.packagePrice
+        : Number(String(body.packagePrice).trim());
+    if (!Number.isFinite(priceRaw) || priceRaw < 0) {
+      return { ok: false, error: "Package price must be a non-negative number." };
+    }
+    packagePrice = priceRaw > 0 ? Math.round(priceRaw) : null;
+  }
+
   return {
     ok: true,
     trip: {
@@ -78,6 +91,7 @@ export function parseCreateTripInput(
       capacity,
       status,
       accommodationNote,
+      packagePrice,
     },
   };
 }
@@ -90,7 +104,7 @@ export async function createTripInNeon(
   const tripId = id("t");
   await sql`
     INSERT INTO trips
-      (id, tenant_id, name, destination, departure_date, capacity, status, accommodation_note)
+      (id, tenant_id, name, destination, departure_date, capacity, status, accommodation_note, public_package_price)
     VALUES
       (
         ${tripId},
@@ -100,7 +114,8 @@ export async function createTripInNeon(
         ${input.departureDate},
         ${input.capacity},
         ${input.status},
-        ${input.accommodationNote}
+        ${input.accommodationNote},
+        ${input.packagePrice}
       )
   `;
   return { id: tripId, ...input };

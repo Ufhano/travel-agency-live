@@ -366,6 +366,7 @@ export function AllocatePaymentForm({
                   capacity: 40,
                   status: "Open",
                   accommodationNote: "",
+                  packagePrice: null,
                 };
                 setTripList((prev) => {
                   if (prev.some((t) => t.id === trip.id)) return prev;
