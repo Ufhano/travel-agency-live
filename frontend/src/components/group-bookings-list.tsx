@@ -142,7 +142,7 @@ export function GroupBookingsList() {
                 </TableCell>
                 <TableCell>{gb.tripName}</TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatZAR(gb.totalAmount)}
+                  {formatZAR(gb.totalExpected)}
                 </TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   {formatDate(gb.paidAt)}

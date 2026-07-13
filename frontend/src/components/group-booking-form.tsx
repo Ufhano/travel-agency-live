@@ -81,6 +81,10 @@ export function GroupBookingForm({
     totalNum > 0 &&
     allocationSum === Math.round(totalNum);
   const packageValid = Number.isFinite(packageNum) && packageNum > 0;
+  const expectedGroupTotal =
+    packageValid && passengers.length > 0
+      ? Math.round(packageNum) * passengers.length
+      : 0;
 
   function onTripChange(nextTripId: string) {
     setTripId(nextTripId);
@@ -212,8 +216,8 @@ export function GroupBookingForm({
         <CardHeader>
           <CardTitle className="text-base">Trip &amp; total payment</CardTitle>
           <CardDescription>
-            Select the departure, enter the bulk group payment received, and the
-            full package price per person.
+            Enter the package price per person. The group total is package ×
+            passengers. The initial deposit below is split across the list.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -249,7 +253,24 @@ export function GroupBookingForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="totalAmount">Group payment received</Label>
+            <Label htmlFor="expectedGroupTotal">Group payment received</Label>
+            <Input
+              id="expectedGroupTotal"
+              type="text"
+              className="tabular-nums"
+              value={
+                expectedGroupTotal > 0 ? formatZAR(expectedGroupTotal) : "—"
+              }
+              readOnly
+              disabled
+            />
+            <p className="text-xs text-muted-foreground">
+              Package × {passengers.length} passenger
+              {passengers.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="totalAmount">Initial deposit to split</Label>
             <Input
               id="totalAmount"
               type="number"
