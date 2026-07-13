@@ -7,19 +7,34 @@ ALTER TABLE group_booking_passengers
 ALTER TABLE group_booking_passengers
   ADD COLUMN IF NOT EXISTS amount_paid INTEGER NOT NULL DEFAULT 0;
 
--- Backfill existing rows: treat allocation as paid when marked paid, else zero.
-UPDATE group_booking_passengers
+-- Backfill: package defaults to allocation; amount_paid = initial share + follow-ups.
+UPDATE group_booking_passengers gbp
 SET
-  package_price = COALESCE(package_price, amount),
-  amount_paid = CASE
-    WHEN paid_status = 'paid' THEN amount
-    ELSE COALESCE(NULLIF(amount_paid, 0), 0)
-  END
-WHERE package_price IS NULL;
+  package_price = COALESCE(gbp.package_price, gbp.amount),
+  amount_paid = gbp.amount + COALESCE((
+    SELECT SUM(p.amount)::int
+    FROM group_booking_passenger_payments p
+    WHERE p.passenger_id = gbp.id
+  ), 0);
 
-UPDATE group_booking_passengers
-SET package_price = amount
-WHERE package_price IS NULL;
+UPDATE group_bookings gb
+SET status = CASE
+  WHEN NOT EXISTS (
+    SELECT 1 FROM group_booking_passengers gbp
+    WHERE gbp.group_booking_id = gb.id
+  ) THEN 'Pending'
+  WHEN NOT EXISTS (
+    SELECT 1 FROM group_booking_passengers gbp
+    WHERE gbp.group_booking_id = gb.id
+      AND COALESCE(gbp.package_price, gbp.amount) > COALESCE(gbp.amount_paid, 0)
+  ) THEN 'Complete'
+  WHEN EXISTS (
+    SELECT 1 FROM group_booking_passengers gbp
+    WHERE gbp.group_booking_id = gb.id
+      AND COALESCE(gbp.amount_paid, 0) > 0
+  ) THEN 'Partial'
+  ELSE 'Pending'
+END;
 
 CREATE TABLE IF NOT EXISTS group_booking_passenger_payments (
   id TEXT PRIMARY KEY,

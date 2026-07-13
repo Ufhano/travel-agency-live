@@ -151,6 +151,17 @@ async function main() {
       ON group_booking_documents (passenger_payment_id)
   `;
 
+  await sql`
+    UPDATE group_booking_passengers gbp
+    SET
+      package_price = COALESCE(gbp.package_price, gbp.amount),
+      amount_paid = gbp.amount + COALESCE((
+        SELECT SUM(p.amount)::int
+        FROM group_booking_passenger_payments p
+        WHERE p.passenger_id = gbp.id
+      ), 0)
+  `;
+
   console.log("OK: group_bookings tables are ready.");
 }
 
