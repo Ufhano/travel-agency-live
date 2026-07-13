@@ -24,6 +24,7 @@ type TripOption = {
   name: string;
   destination: string;
   departureDate: string;
+  packagePrice?: number | null;
 };
 
 type FormState = {
@@ -36,12 +37,22 @@ type FormState = {
   balanceDueDate: string;
 };
 
-const emptyForm = (defaultTripId: string): FormState => ({
+function packagePriceForTrip(
+  trips: TripOption[],
+  tripId: string,
+): string {
+  const trip = trips.find((t) => t.id === tripId);
+  return trip?.packagePrice != null && trip.packagePrice > 0
+    ? String(trip.packagePrice)
+    : "";
+}
+
+const emptyForm = (trips: TripOption[], defaultTripId: string): FormState => ({
   tripId: defaultTripId,
   fullName: "",
   phone: "",
   email: "",
-  packagePrice: "",
+  packagePrice: packagePriceForTrip(trips, defaultTripId),
   discount: "",
   balanceDueDate: "",
 });
@@ -63,7 +74,7 @@ export function AddClientDialog({
   const [tripList, setTripList] = React.useState(trips);
   const [showCreateTrip, setShowCreateTrip] = React.useState(false);
   const [form, setForm] = React.useState<FormState>(() =>
-    emptyForm(initialTripId),
+    emptyForm(trips, initialTripId),
   );
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -79,7 +90,7 @@ export function AddClientDialog({
   function handleOpenChange(next: boolean) {
     if (next) {
       setTripList(trips);
-      setForm(emptyForm(defaultTripId ?? trips[0]?.id ?? ""));
+      setForm(emptyForm(trips, defaultTripId ?? trips[0]?.id ?? ""));
       setError(null);
       setShowCreateTrip(!lockTrip && trips.length === 0);
     }
@@ -95,13 +106,30 @@ export function AddClientDialog({
         a.departureDate.localeCompare(b.departureDate),
       );
     });
-    setForm((prev) => ({ ...prev, tripId: trip.id }));
+    setForm((prev) => ({
+      ...prev,
+      tripId: trip.id,
+      packagePrice:
+        trip.packagePrice != null && trip.packagePrice > 0
+          ? String(trip.packagePrice)
+          : prev.packagePrice,
+    }));
     setShowCreateTrip(false);
     router.refresh();
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      if (key === "tripId" && typeof value === "string") {
+        const hint = packagePriceForTrip(tripList, value);
+        return {
+          ...prev,
+          tripId: value,
+          packagePrice: hint || prev.packagePrice,
+        };
+      }
+      return { ...prev, [key]: value };
+    });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

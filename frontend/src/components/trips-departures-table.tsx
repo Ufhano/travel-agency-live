@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { InlineTripDateCell } from "@/components/inline-trip-date-cell";
+import { InlineTripPackagePrice } from "@/components/inline-trip-package-price";
 import { TableSearchInput } from "@/components/table-search-input";
 import { TripStatusBadge } from "@/components/trip-status-badge";
 import { DeleteTripButton } from "@/components/delete-trip-button";
@@ -23,6 +24,7 @@ export type TripDepartureRow = {
   tripName: string;
   destination: string;
   departureDate: string;
+  packagePrice: number | null;
   confirmedCount: number;
   capacity: number;
   outstanding: number;
@@ -73,9 +75,10 @@ export function TripsDeparturesTable({ rows }: Props) {
             <TableRow>
               <TableHead>Trip</TableHead>
               <TableHead className="hidden md:table-cell">Departs</TableHead>
+              <TableHead className="hidden lg:table-cell text-right">Package</TableHead>
               <TableHead className="hidden sm:table-cell text-right">Travellers</TableHead>
               <TableHead className="text-right">Outstanding</TableHead>
-              <TableHead className="hidden lg:table-cell">Status</TableHead>
+              <TableHead className="hidden xl:table-cell">Status</TableHead>
               <TableHead className="w-[56px] text-right">
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -85,7 +88,7 @@ export function TripsDeparturesTable({ rows }: Props) {
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
                   No trips yet. Use the form above to create your first departure.
@@ -94,7 +97,7 @@ export function TripsDeparturesTable({ rows }: Props) {
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-8 text-center text-sm text-muted-foreground"
                 >
                   No trips match your search.
@@ -111,11 +114,25 @@ export function TripsDeparturesTable({ rows }: Props) {
                       {row.tripName}
                     </Link>
                     <div className="text-xs text-muted-foreground">{row.destination}</div>
+                    <div className="mt-0.5 text-xs tabular-nums text-muted-foreground lg:hidden">
+                      <InlineTripPackagePrice
+                        tripId={row.tripId}
+                        packagePrice={row.packagePrice}
+                        compact
+                      />
+                    </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell whitespace-nowrap text-muted-foreground">
                     <InlineTripDateCell
                       tripId={row.tripId}
                       departureDate={row.departureDate}
+                    />
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-right">
+                    <InlineTripPackagePrice
+                      tripId={row.tripId}
+                      packagePrice={row.packagePrice}
+                      compact
                     />
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-right tabular-nums text-muted-foreground">
@@ -124,7 +141,7 @@ export function TripsDeparturesTable({ rows }: Props) {
                   <TableCell className="text-right tabular-nums font-medium">
                     {formatZAR(row.outstanding)}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
+                  <TableCell className="hidden xl:table-cell">
                     <TripStatusBadge status={row.status} />
                   </TableCell>
                   <TableCell className="text-right">

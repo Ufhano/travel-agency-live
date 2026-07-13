@@ -11,6 +11,7 @@ import type {
   GroupBookingPassengerPayment,
   GroupBookingStatus,
   GroupBookingWithPassengers,
+  TenantGroupSplitPassenger,
   TripGroupSplitPassenger,
 } from "./types";
 
@@ -538,6 +539,64 @@ export async function listTripGroupSplitPassengers(
     id: row.id,
     groupBookingId: row.group_booking_id,
     referenceNumber: row.reference_number,
+    passengerName: row.passenger_name,
+    passengerEmail: row.passenger_email,
+    packagePrice: Number(row.package_price ?? row.amount),
+    amountPaid: Number(row.amount_paid ?? 0),
+  }));
+}
+
+/** All group-split passengers for a tenant (Clients directory). */
+export async function listTenantGroupSplitPassengers(
+  sql: SqlExecutor,
+  tenantId: string,
+): Promise<TenantGroupSplitPassenger[]> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const rows = (await sql`
+    SELECT
+      gbp.id,
+      gbp.group_booking_id,
+      gb.reference_number,
+      gb.trip_id,
+      t.name AS trip_name,
+      t.destination AS trip_destination,
+      t.departure_date,
+      gbp.passenger_name,
+      gbp.passenger_email,
+      gbp.package_price,
+      gbp.amount,
+      gbp.amount_paid,
+      gbp.created_at
+    FROM group_booking_passengers gbp
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    JOIN trips t ON t.id = gb.trip_id
+    WHERE gb.tenant_id = ${tenantId}
+    ORDER BY t.destination ASC, gbp.passenger_name ASC
+  `) as {
+    id: string;
+    group_booking_id: string;
+    reference_number: string;
+    trip_id: string;
+    trip_name: string;
+    trip_destination: string;
+    departure_date: unknown;
+    passenger_name: string;
+    passenger_email: string;
+    package_price: number | string | null;
+    amount: number | string;
+    amount_paid: number | string | null;
+    created_at: unknown;
+  }[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    groupBookingId: row.group_booking_id,
+    referenceNumber: row.reference_number,
+    tripId: row.trip_id,
+    tripName: row.trip_name,
+    tripDestination: row.trip_destination,
+    departureDate: isoDateSlice(row.departure_date),
     passengerName: row.passenger_name,
     passengerEmail: row.passenger_email,
     packagePrice: Number(row.package_price ?? row.amount),

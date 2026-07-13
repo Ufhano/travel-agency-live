@@ -10,15 +10,20 @@ export type UpdateTripInput = {
   name?: unknown;
   destination?: unknown;
   departureDate?: unknown;
+  packagePrice?: unknown;
 };
+
+export type TripPatch = Partial<
+  Pick<Trip, "name" | "destination" | "departureDate" | "packagePrice">
+>;
 
 export function parseUpdateTripInput(
   body: UpdateTripInput,
-): { ok: true; id: string; patch: Partial<Pick<Trip, "name" | "destination" | "departureDate">> } | { ok: false; error: string } {
+): { ok: true; id: string; patch: TripPatch } | { ok: false; error: string } {
   const id = typeof body.id === "string" ? body.id.trim() : "";
   if (!id) return { ok: false, error: "Trip id is required." };
 
-  const patch: Partial<Pick<Trip, "name" | "destination" | "departureDate">> = {};
+  const patch: TripPatch = {};
 
   if (body.name !== undefined) {
     const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -42,6 +47,24 @@ export function parseUpdateTripInput(
     patch.departureDate = departureDate;
   }
 
+  if (body.packagePrice !== undefined) {
+    if (body.packagePrice === null || body.packagePrice === "") {
+      patch.packagePrice = null;
+    } else {
+      const priceRaw =
+        typeof body.packagePrice === "number"
+          ? body.packagePrice
+          : Number(String(body.packagePrice).trim());
+      if (!Number.isFinite(priceRaw) || priceRaw < 0) {
+        return {
+          ok: false,
+          error: "Package price must be a non-negative number.",
+        };
+      }
+      patch.packagePrice = priceRaw > 0 ? Math.round(priceRaw) : null;
+    }
+  }
+
   if (Object.keys(patch).length === 0) {
     return { ok: false, error: "Nothing to update." };
   }
@@ -53,10 +76,10 @@ export async function updateTripInNeon(
   sql: SqlExecutor,
   tenantId: string,
   id: string,
-  patch: Partial<Pick<Trip, "name" | "destination" | "departureDate">>,
+  patch: TripPatch,
 ): Promise<Trip | null> {
   const existing = (await sql`
-    SELECT id, name, destination, departure_date, capacity, status, accommodation_note
+    SELECT id, name, destination, departure_date, capacity, status, accommodation_note, public_package_price
     FROM trips WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1
   `) as Array<{
     id: string;
@@ -66,6 +89,7 @@ export async function updateTripInNeon(
     capacity: number;
     status: string;
     accommodation_note: string;
+    public_package_price: number | null;
   }>;
 
   const row = existing[0];
@@ -74,13 +98,20 @@ export async function updateTripInNeon(
   const name = patch.name ?? row.name;
   const destination = patch.destination ?? row.destination;
   const departureDate = patch.departureDate ?? String(row.departure_date).slice(0, 10);
+  const packagePrice =
+    patch.packagePrice !== undefined
+      ? patch.packagePrice
+      : row.public_package_price != null && Number(row.public_package_price) > 0
+        ? Number(row.public_package_price)
+        : null;
 
   await sql`
     UPDATE trips
     SET
       name = ${name},
       destination = ${destination},
-      departure_date = ${departureDate}
+      departure_date = ${departureDate},
+      public_package_price = ${packagePrice}
     WHERE id = ${id} AND tenant_id = ${tenantId}
   `;
 
@@ -92,5 +123,6 @@ export async function updateTripInNeon(
     capacity: row.capacity,
     status: row.status as Trip["status"],
     accommodationNote: row.accommodation_note,
+    packagePrice,
   };
 }

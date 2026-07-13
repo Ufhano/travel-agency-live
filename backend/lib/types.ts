@@ -21,6 +21,11 @@ export interface Trip {
   /** Base workflow status from operations (some badges are computed separately). */
   status: TripStatus;
   accommodationNote: string;
+  /**
+   * Default package price in ZAR for this departure.
+   * Used as a hint when adding travellers / group splits, and for public booking.
+   */
+  packagePrice: number | null;
 }
 
 export interface Client {
@@ -150,4 +155,12 @@ export interface TripGroupSplitPassenger {
   passengerEmail: string;
   packagePrice: number;
   amountPaid: number;
+}
+
+/** Group-split passenger with trip context for the Clients directory. */
+export interface TenantGroupSplitPassenger extends TripGroupSplitPassenger {
+  tripId: string;
+  tripName: string;
+  tripDestination: string;
+  departureDate: string;
 }

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
 import { ClientRowActions } from "@/components/client-row-actions";
+import { GroupSplitBadge } from "@/components/group-split-badge";
 import { InlineTripNameCell } from "@/components/inline-trip-name-cell";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { TableSearchInput } from "@/components/table-search-input";
@@ -20,12 +21,25 @@ import { matchesSearch } from "@/lib/search-utils";
 import { formatZAR } from "@/lib/utils";
 import type { Client, Trip } from "@backend/types";
 
-export type ClientDirectoryRow = {
-  client: Client;
-  trip: Trip;
-  paid: number;
-  balance: number;
-};
+export type ClientDirectoryRow =
+  | {
+      kind: "client";
+      client: Client;
+      trip: Trip;
+      paid: number;
+      balance: number;
+    }
+  | {
+      kind: "group-split";
+      passengerId: string;
+      groupBookingId: string;
+      referenceNumber: string;
+      passengerName: string;
+      trip: Trip;
+      paid: number;
+      balance: number;
+      packagePrice: number;
+    };
 
 type DestinationGroup = {
   destination: string;
@@ -43,15 +57,27 @@ export function ClientsDirectorySection({ destinationGroups, trips }: Props) {
   const filteredGroups = destinationGroups
     .map(({ destination, rows }) => ({
       destination,
-      rows: rows.filter((row) =>
-        matchesSearch(
+      rows: rows.filter((row) => {
+        if (row.kind === "client") {
+          return matchesSearch(
+            search,
+            row.client.fullName,
+            row.trip.name,
+            row.trip.destination,
+            destination,
+          );
+        }
+        return matchesSearch(
           search,
-          row.client.fullName,
+          row.passengerName,
           row.trip.name,
           row.trip.destination,
+          row.referenceNumber,
           destination,
-        ),
-      ),
+          "group split",
+          "gs",
+        );
+      }),
     }))
     .filter((group) => group.rows.length > 0);
 
@@ -85,84 +111,149 @@ export function ClientsDirectorySection({ destinationGroups, trips }: Props) {
           </CardHeader>
         </Card>
       ) : (
-        filteredGroups.map(({ destination, rows }) => (
-          <Card key={destination}>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Destination
-                </p>
-                <CardTitle className="text-lg">{destination}</CardTitle>
-                <CardDescription>
-                  {rows.length} traveller
-                  {rows.length === 1 ? "" : "s"}
-                </CardDescription>
-              </div>
-              <DeleteClientsBulkButton
-                mode={{
-                  kind: "destination",
-                  destination,
-                  label: destination,
-                  count: rows.length,
-                }}
-              />
-            </CardHeader>
-            <CardContent className="p-0 sm:px-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Client</TableHead>
-                    <TableHead className="hidden md:table-cell">Trip</TableHead>
-                    <TableHead className="text-right leading-snug lg:whitespace-normal max-w-[8rem]">
-                      Total amount to be paid
-                    </TableHead>
-                    <TableHead className="text-right">Amount paid</TableHead>
-                    <TableHead className="text-right leading-snug lg:whitespace-normal max-w-[8rem]">
-                      Outstanding amount
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[72px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map(({ client, trip, paid, balance }) => (
-                    <TableRow key={client.id}>
-                      <TableCell>
-                        <Link
-                          href={`/clients/${client.id}`}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {client.fullName}
-                        </Link>
-                        <div className="text-xs text-muted-foreground md:hidden">
-                          <InlineTripNameCell tripId={trip.id} initialName={trip.name} />
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <InlineTripNameCell tripId={trip.id} initialName={trip.name} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatZAR(client.packagePrice)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-emerald-800 dark:text-emerald-300">
-                        {formatZAR(paid)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {formatZAR(balance)}
-                      </TableCell>
-                      <TableCell>
-                        <ClientFullyPaidBadge balance={balance} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <ClientRowActions client={client} trips={trips} />
-                      </TableCell>
+        filteredGroups.map(({ destination, rows }) => {
+          const regularCount = rows.filter((r) => r.kind === "client").length;
+          return (
+            <Card key={destination}>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Destination
+                  </p>
+                  <CardTitle className="text-lg">{destination}</CardTitle>
+                  <CardDescription>
+                    {rows.length} traveller
+                    {rows.length === 1 ? "" : "s"}
+                  </CardDescription>
+                </div>
+                {regularCount > 0 ? (
+                  <DeleteClientsBulkButton
+                    mode={{
+                      kind: "destination",
+                      destination,
+                      label: destination,
+                      count: regularCount,
+                    }}
+                  />
+                ) : null}
+              </CardHeader>
+              <CardContent className="p-0 sm:px-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Client</TableHead>
+                      <TableHead className="hidden md:table-cell">Trip</TableHead>
+                      <TableHead className="text-right leading-snug lg:whitespace-normal max-w-[8rem]">
+                        Total amount to be paid
+                      </TableHead>
+                      <TableHead className="text-right">Amount paid</TableHead>
+                      <TableHead className="text-right leading-snug lg:whitespace-normal max-w-[8rem]">
+                        Outstanding amount
+                      </TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-[72px] text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ))
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => {
+                      if (row.kind === "group-split") {
+                        return (
+                          <TableRow key={`gs-${row.passengerId}`}>
+                            <TableCell>
+                              <Link
+                                href={`/group-bookings/${row.groupBookingId}`}
+                                className="inline-flex items-center font-medium text-primary hover:underline"
+                              >
+                                {row.passengerName}
+                                <GroupSplitBadge />
+                              </Link>
+                              <div className="text-xs text-muted-foreground">
+                                {row.referenceNumber}
+                              </div>
+                              <div className="text-xs text-muted-foreground md:hidden">
+                                <InlineTripNameCell
+                                  tripId={row.trip.id}
+                                  initialName={row.trip.name}
+                                />
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <InlineTripNameCell
+                                tripId={row.trip.id}
+                                initialName={row.trip.name}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatZAR(row.packagePrice)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-emerald-800 dark:text-emerald-300">
+                              {formatZAR(row.paid)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums font-medium">
+                              {formatZAR(row.balance)}
+                            </TableCell>
+                            <TableCell>
+                              <ClientFullyPaidBadge balance={row.balance} />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Link
+                                href={`/group-bookings/${row.groupBookingId}`}
+                                className="text-xs text-primary hover:underline"
+                              >
+                                Open
+                              </Link>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      const { client, trip, paid, balance } = row;
+                      return (
+                        <TableRow key={client.id}>
+                          <TableCell>
+                            <Link
+                              href={`/clients/${client.id}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {client.fullName}
+                            </Link>
+                            <div className="text-xs text-muted-foreground md:hidden">
+                              <InlineTripNameCell
+                                tripId={trip.id}
+                                initialName={trip.name}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <InlineTripNameCell
+                              tripId={trip.id}
+                              initialName={trip.name}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatZAR(client.packagePrice)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-emerald-800 dark:text-emerald-300">
+                            {formatZAR(paid)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {formatZAR(balance)}
+                          </TableCell>
+                          <TableCell>
+                            <ClientFullyPaidBadge balance={balance} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <ClientRowActions client={client} trips={trips} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          );
+        })
       )}
     </div>
   );

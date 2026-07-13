@@ -66,7 +66,7 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
       const [tripRows, clientRows, paymentRows, invoiceTermsConfig] =
         await Promise.all([
       sql`
-        SELECT id, name, destination, departure_date, capacity, status, accommodation_note
+        SELECT id, name, destination, departure_date, capacity, status, accommodation_note, public_package_price
         FROM trips
         WHERE tenant_id = ${tenantId}
         ORDER BY departure_date ASC
@@ -93,6 +93,10 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
       capacity: Number(row.capacity),
       status: row.status as TripStatus,
       accommodationNote: row.accommodation_note,
+      packagePrice:
+        row.public_package_price != null && Number(row.public_package_price) > 0
+          ? Number(row.public_package_price)
+          : null,
     }));
 
     const mappedClients: Client[] = (clientRows as ClientRow[]).map((row) => ({
@@ -163,6 +167,7 @@ type TripRow = {
   capacity: number;
   status: string;
   accommodation_note: string;
+  public_package_price: number | null;
 };
 
 type ClientRow = {
