@@ -161,7 +161,7 @@ export function ClientsDirectorySection({ destinationGroups, trips }: Props) {
                           <TableRow key={`gs-${row.passengerId}`}>
                             <TableCell>
                               <Link
-                                href={`/group-bookings/${row.groupBookingId}`}
+                                href={`/clients/gs/${row.passengerId}`}
                                 className="inline-flex items-center font-medium text-primary hover:underline"
                               >
                                 {row.passengerName}
@@ -197,7 +197,7 @@ export function ClientsDirectorySection({ destinationGroups, trips }: Props) {
                             </TableCell>
                             <TableCell className="text-right">
                               <Link
-                                href={`/group-bookings/${row.groupBookingId}`}
+                                href={`/clients/gs/${row.passengerId}`}
                                 className="text-xs text-primary hover:underline"
                               >
                                 Open

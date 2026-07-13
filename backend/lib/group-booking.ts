@@ -72,6 +72,14 @@ export async function ensureGroupBookingBalancesSchema(
     ADD COLUMN IF NOT EXISTS amount_paid INTEGER NOT NULL DEFAULT 0
   `;
   await sql`
+    ALTER TABLE group_booking_passengers
+    ADD COLUMN IF NOT EXISTS passenger_phone TEXT NOT NULL DEFAULT ''
+  `;
+  await sql`
+    ALTER TABLE group_booking_passengers
+    ADD COLUMN IF NOT EXISTS passenger_id_number TEXT
+  `;
+  await sql`
     CREATE TABLE IF NOT EXISTS group_booking_passenger_payments (
       id TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
@@ -581,6 +589,8 @@ export async function listTripGroupSplitPassengers(
       gb.reference_number,
       gbp.passenger_name,
       gbp.passenger_email,
+      COALESCE(gbp.passenger_phone, '') AS passenger_phone,
+      gbp.passenger_id_number,
       gbp.package_price,
       gbp.amount,
       gbp.amount_paid,
@@ -596,6 +606,8 @@ export async function listTripGroupSplitPassengers(
     reference_number: string;
     passenger_name: string;
     passenger_email: string;
+    passenger_phone: string;
+    passenger_id_number: string | null;
     package_price: number | string | null;
     amount: number | string;
     amount_paid: number | string | null;
@@ -608,6 +620,10 @@ export async function listTripGroupSplitPassengers(
     referenceNumber: row.reference_number,
     passengerName: row.passenger_name,
     passengerEmail: row.passenger_email,
+    passengerPhone: row.passenger_phone ?? "",
+    passengerIdNumber: row.passenger_id_number?.trim()
+      ? row.passenger_id_number.trim()
+      : null,
     packagePrice: Number(row.package_price ?? row.amount),
     amountPaid: Number(row.amount_paid ?? 0),
   }));
@@ -631,6 +647,8 @@ export async function listTenantGroupSplitPassengers(
       t.departure_date,
       gbp.passenger_name,
       gbp.passenger_email,
+      COALESCE(gbp.passenger_phone, '') AS passenger_phone,
+      gbp.passenger_id_number,
       gbp.package_price,
       gbp.amount,
       gbp.amount_paid,
@@ -650,6 +668,8 @@ export async function listTenantGroupSplitPassengers(
     departure_date: unknown;
     passenger_name: string;
     passenger_email: string;
+    passenger_phone: string;
+    passenger_id_number: string | null;
     package_price: number | string | null;
     amount: number | string;
     amount_paid: number | string | null;
@@ -666,9 +686,280 @@ export async function listTenantGroupSplitPassengers(
     departureDate: isoDateSlice(row.departure_date),
     passengerName: row.passenger_name,
     passengerEmail: row.passenger_email,
+    passengerPhone: row.passenger_phone ?? "",
+    passengerIdNumber: row.passenger_id_number?.trim()
+      ? row.passenger_id_number.trim()
+      : null,
     packagePrice: Number(row.package_price ?? row.amount),
     amountPaid: Number(row.amount_paid ?? 0),
   }));
+}
+
+export async function getTenantGroupSplitPassengerById(
+  sql: SqlExecutor,
+  tenantId: string,
+  passengerId: string,
+): Promise<
+  (TenantGroupSplitPassenger & { allocatedAmount: number; paidAt: string }) | null
+> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const rows = (await sql`
+    SELECT
+      gbp.id,
+      gbp.group_booking_id,
+      gb.reference_number,
+      gb.paid_at,
+      gb.trip_id,
+      t.name AS trip_name,
+      t.destination AS trip_destination,
+      t.departure_date,
+      gbp.passenger_name,
+      gbp.passenger_email,
+      COALESCE(gbp.passenger_phone, '') AS passenger_phone,
+      gbp.passenger_id_number,
+      gbp.package_price,
+      gbp.amount,
+      gbp.amount_paid,
+      gbp.created_at
+    FROM group_booking_passengers gbp
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    JOIN trips t ON t.id = gb.trip_id
+    WHERE gb.tenant_id = ${tenantId}
+      AND gbp.id = ${passengerId}
+    LIMIT 1
+  `) as {
+    id: string;
+    group_booking_id: string;
+    reference_number: string;
+    paid_at: string | Date;
+    trip_id: string;
+    trip_name: string;
+    trip_destination: string;
+    departure_date: unknown;
+    passenger_name: string;
+    passenger_email: string;
+    passenger_phone: string;
+    passenger_id_number: string | null;
+    package_price: number | string | null;
+    amount: number | string;
+    amount_paid: number | string | null;
+    created_at: unknown;
+  }[];
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    groupBookingId: row.group_booking_id,
+    referenceNumber: row.reference_number,
+    tripId: row.trip_id,
+    tripName: row.trip_name,
+    tripDestination: row.trip_destination,
+    departureDate: isoDateSlice(row.departure_date),
+    passengerName: row.passenger_name,
+    passengerEmail: row.passenger_email,
+    passengerPhone: row.passenger_phone ?? "",
+    passengerIdNumber: row.passenger_id_number?.trim()
+      ? row.passenger_id_number.trim()
+      : null,
+    packagePrice: Number(row.package_price ?? row.amount),
+    amountPaid: Number(row.amount_paid ?? 0),
+    allocatedAmount: Number(row.amount),
+    paidAt: isoDateSlice(row.paid_at),
+  };
+}
+
+export type UpdateGroupSplitPassengerContactInput = {
+  passengerEmail?: string;
+  passengerPhone?: string;
+  passengerIdNumber?: string | null;
+};
+
+export async function updateGroupSplitPassengerContact(
+  sql: SqlExecutor,
+  tenantId: string,
+  passengerId: string,
+  input: UpdateGroupSplitPassengerContactInput,
+): Promise<
+  | { ok: true; passenger: TenantGroupSplitPassenger & { allocatedAmount: number; paidAt: string } }
+  | { ok: false; error: string }
+> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const existing = await getTenantGroupSplitPassengerById(
+    sql,
+    tenantId,
+    passengerId,
+  );
+  if (!existing) return { ok: false, error: "Passenger not found." };
+
+  const email =
+    input.passengerEmail !== undefined
+      ? input.passengerEmail.trim()
+      : existing.passengerEmail;
+  const phone =
+    input.passengerPhone !== undefined
+      ? input.passengerPhone.trim()
+      : existing.passengerPhone;
+  const idNumberRaw =
+    input.passengerIdNumber !== undefined
+      ? input.passengerIdNumber
+      : existing.passengerIdNumber;
+  const idNumber =
+    idNumberRaw == null || !String(idNumberRaw).trim()
+      ? null
+      : String(idNumberRaw).trim();
+
+  if (email && !EMAIL_RE.test(email)) {
+    return { ok: false, error: "Enter a valid email address." };
+  }
+
+  await sql`
+    UPDATE group_booking_passengers
+    SET
+      passenger_email = ${email},
+      passenger_phone = ${phone},
+      passenger_id_number = ${idNumber}
+    WHERE id = ${passengerId}
+      AND group_booking_id IN (
+        SELECT id FROM group_bookings WHERE tenant_id = ${tenantId}
+      )
+  `;
+
+  const updated = await getTenantGroupSplitPassengerById(
+    sql,
+    tenantId,
+    passengerId,
+  );
+  if (!updated) return { ok: false, error: "Passenger not found after update." };
+  return { ok: true, passenger: updated };
+}
+
+export async function deleteGroupSplitPassenger(
+  sql: SqlExecutor,
+  tenantId: string,
+  passengerId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const existing = await getTenantGroupSplitPassengerById(
+    sql,
+    tenantId,
+    passengerId,
+  );
+  if (!existing) return { ok: false, error: "Passenger not found." };
+
+  const groupBookingId = existing.groupBookingId;
+
+  await sql`
+    DELETE FROM group_booking_passengers gbp
+    USING group_bookings gb
+    WHERE gbp.id = ${passengerId}
+      AND gbp.group_booking_id = gb.id
+      AND gb.tenant_id = ${tenantId}
+  `;
+
+  const remaining = (await sql`
+    SELECT
+      COALESCE(package_price, amount) AS package_price,
+      COALESCE(amount_paid, 0) AS amount_paid
+    FROM group_booking_passengers
+    WHERE group_booking_id = ${groupBookingId}
+  `) as { package_price: number | string; amount_paid: number | string }[];
+
+  const groupStatus = computeGroupBookingStatus(
+    remaining.map((r) => ({
+      packagePrice: Number(r.package_price),
+      amountPaid: Number(r.amount_paid),
+    })),
+  );
+
+  await sql`
+    UPDATE group_bookings
+    SET
+      status = ${groupStatus},
+      total_amount = ${remaining.reduce(
+        (sum, r) => sum + Number(r.package_price),
+        0,
+      )}
+    WHERE id = ${groupBookingId}
+      AND tenant_id = ${tenantId}
+  `;
+
+  return { ok: true };
+}
+
+export async function deleteGroupSplitPassengerPayment(
+  sql: SqlExecutor,
+  tenantId: string,
+  groupBookingId: string,
+  passengerId: string,
+  paymentId: string,
+): Promise<
+  | { ok: true; groupStatus: GroupBookingStatus }
+  | { ok: false; error: string }
+> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const paymentRows = (await sql`
+    SELECT p.id
+    FROM group_booking_passenger_payments p
+    JOIN group_booking_passengers gbp ON gbp.id = p.passenger_id
+    JOIN group_bookings gb ON gb.id = gbp.group_booking_id
+    WHERE p.id = ${paymentId}
+      AND p.passenger_id = ${passengerId}
+      AND gbp.group_booking_id = ${groupBookingId}
+      AND p.tenant_id = ${tenantId}
+      AND gb.tenant_id = ${tenantId}
+    LIMIT 1
+  `) as { id: string }[];
+
+  if (!paymentRows[0]) {
+    return { ok: false, error: "Payment not found." };
+  }
+
+  await sql`
+    DELETE FROM group_booking_passenger_payments
+    WHERE id = ${paymentId}
+      AND tenant_id = ${tenantId}
+  `;
+
+  await sql`
+    UPDATE group_booking_passengers gbp
+    SET amount_paid = gbp.amount + COALESCE((
+      SELECT SUM(p.amount)::int
+      FROM group_booking_passenger_payments p
+      WHERE p.passenger_id = gbp.id
+    ), 0)
+    WHERE gbp.id = ${passengerId}
+      AND gbp.group_booking_id = ${groupBookingId}
+  `;
+
+  const remaining = (await sql`
+    SELECT
+      COALESCE(package_price, amount) AS package_price,
+      COALESCE(amount_paid, 0) AS amount_paid
+    FROM group_booking_passengers
+    WHERE group_booking_id = ${groupBookingId}
+  `) as { package_price: number | string; amount_paid: number | string }[];
+
+  const groupStatus = computeGroupBookingStatus(
+    remaining.map((r) => ({
+      packagePrice: Number(r.package_price),
+      amountPaid: Number(r.amount_paid),
+    })),
+  );
+
+  await sql`
+    UPDATE group_bookings
+    SET status = ${groupStatus}
+    WHERE id = ${groupBookingId}
+      AND tenant_id = ${tenantId}
+  `;
+
+  return { ok: true, groupStatus };
 }
 
 export async function getGroupBookingById(

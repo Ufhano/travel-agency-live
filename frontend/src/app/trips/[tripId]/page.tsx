@@ -298,7 +298,7 @@ export default async function TripPage({
                   <TableRow key={`gs-${p.id}`}>
                     <TableCell>
                       <Link
-                        href={`/group-bookings/${p.groupBookingId}`}
+                        href={`/clients/gs/${p.id}`}
                         className="inline-flex items-center font-medium text-primary hover:underline"
                       >
                         {p.passengerName}
