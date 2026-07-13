@@ -157,6 +157,10 @@ export interface TripGroupSplitPassenger {
   referenceNumber: string;
   passengerName: string;
   passengerEmail: string;
+  /** Optional contact phone. */
+  passengerPhone: string;
+  /** Optional national ID / passport. */
+  passengerIdNumber: string | null;
   packagePrice: number;
   amountPaid: number;
 }

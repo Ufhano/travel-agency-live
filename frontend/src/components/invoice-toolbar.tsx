@@ -53,6 +53,9 @@ export function InvoiceToolbar({
   tripName,
   amount,
   balance,
+  profileHref,
+  invoicesHref,
+  showDelete = true,
 }: {
   paymentId: string;
   clientId: string;
@@ -64,6 +67,11 @@ export function InvoiceToolbar({
   tripName: string;
   amount: number;
   balance: number;
+  /** Override the “Client profile” link (e.g. group-split passenger pages). */
+  profileHref?: string;
+  /** Override the “All invoices” back link. */
+  invoicesHref?: string;
+  showDelete?: boolean;
 }) {
   const [busy, setBusy] = useState<"whatsapp" | "email" | "pdf" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -187,15 +195,17 @@ export function InvoiceToolbar({
     <div className="no-print space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          href="/invoices"
+          href={invoicesHref ?? "/invoices"}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          All invoices
+          {invoicesHref ? "Back to profile" : "All invoices"}
         </Link>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={`/clients/${clientId}`}>Client profile</Link>
+            <Link href={profileHref ?? `/clients/${clientId}`}>
+              Client profile
+            </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href={`/trips/${tripId}`}>Trip detail</Link>
@@ -273,15 +283,17 @@ export function InvoiceToolbar({
             )}
             Save as PDF
           </Button>
-          <DeleteInvoiceButton
-            paymentId={paymentId}
-            invoiceNumber={invoiceNumber}
-            clientName={clientName}
-            redirectTo="/invoices"
-            variant="outline"
-            size="sm"
-            label="Delete"
-          />
+          {showDelete ? (
+            <DeleteInvoiceButton
+              paymentId={paymentId}
+              invoiceNumber={invoiceNumber}
+              clientName={clientName}
+              redirectTo="/invoices"
+              variant="outline"
+              size="sm"
+              label="Delete"
+            />
+          ) : null}
         </div>
       </div>
       {error ? (
