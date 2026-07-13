@@ -278,10 +278,6 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
 
   if (!groupBooking) return null;
 
-  const fullyPaidCount = groupBooking.passengers.filter(
-    (p) => passengerBalance(p) <= 0,
-  ).length;
-
   const paymentsByPassenger = new Map<string, GroupBookingPassengerPayment[]>();
   for (const payment of followUpPayments) {
     const list = paymentsByPassenger.get(payment.passengerId) ?? [];
@@ -290,6 +286,15 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
   }
 
   const packagePerPerson = groupBooking.passengers[0]?.packagePrice;
+  const passengerCount = groupBooking.passengers.length;
+  const groupExpectedTotal =
+    packagePerPerson != null
+      ? packagePerPerson * passengerCount
+      : groupBooking.passengers.reduce((sum, p) => sum + p.packagePrice, 0);
+  const groupPaidTotal = groupBooking.passengers.reduce(
+    (sum, p) => sum + p.amountPaid,
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -321,7 +326,7 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
               Group payment received
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
-              {formatZAR(groupBooking.totalAmount)}
+              {formatZAR(groupExpectedTotal)}
             </p>
           </div>
           <div>
@@ -353,7 +358,7 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
               Fully paid
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
-              {fullyPaidCount} / {groupBooking.passengers.length}
+              {formatZAR(groupPaidTotal)} / {formatZAR(groupExpectedTotal)}
             </p>
           </div>
           <div className="sm:col-span-2 lg:col-span-4">
@@ -387,9 +392,7 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
         <CardHeader>
           <CardTitle className="text-base">Passengers</CardTitle>
           <CardDescription>
-            Each passenger&apos;s initial share from the group payment is credited
-            automatically. Record additional payments until their balance is
-            cleared.
+            Record payments until each passenger&apos;s balance is cleared.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
@@ -415,19 +418,11 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
                   <ClientFullyPaidBadge balance={balance} />
                 </div>
 
-                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
+                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Package</p>
                     <p className="font-semibold tabular-nums">
                       {formatZAR(p.packagePrice)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Initial share
-                    </p>
-                    <p className="font-semibold tabular-nums">
-                      {formatZAR(p.allocatedAmount)}
                     </p>
                   </div>
                   <div>

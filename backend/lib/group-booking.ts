@@ -485,7 +485,9 @@ export async function listGroupBookings(
       gb.status,
       gb.created_at,
       t.name AS trip_name,
-      COUNT(gbp.id)::int AS passenger_count
+      COUNT(gbp.id)::int AS passenger_count,
+      COALESCE(SUM(COALESCE(gbp.package_price, gbp.amount)), 0)::int AS total_expected,
+      COALESCE(SUM(COALESCE(gbp.amount_paid, 0)), 0)::int AS total_paid
     FROM group_bookings gb
     JOIN trips t ON t.id = gb.trip_id
     LEFT JOIN group_booking_passengers gbp ON gbp.group_booking_id = gb.id
@@ -502,6 +504,8 @@ export async function listGroupBookings(
     created_at: unknown;
     trip_name: string;
     passenger_count: number | string;
+    total_expected: number | string;
+    total_paid: number | string;
   }[];
 
   return rows.map((row) => ({
@@ -514,6 +518,8 @@ export async function listGroupBookings(
     createdAt: isoTimestamp(row.created_at),
     tripName: row.trip_name,
     passengerCount: Number(row.passenger_count),
+    totalExpected: Number(row.total_expected),
+    totalPaid: Number(row.total_paid),
   }));
 }
 
@@ -1024,6 +1030,9 @@ export async function updateGroupBookingPackagePrice(
     };
   }
 
+  const passengerCount = passengerRows.length;
+  const totalExpected = packagePrice * passengerCount;
+
   await sql`
     UPDATE group_booking_passengers
     SET package_price = ${packagePrice}
@@ -1039,7 +1048,9 @@ export async function updateGroupBookingPackagePrice(
 
   await sql`
     UPDATE group_bookings
-    SET status = ${groupStatus}
+    SET
+      status = ${groupStatus},
+      total_amount = ${totalExpected}
     WHERE id = ${groupBookingId}
       AND tenant_id = ${tenantId}
   `;

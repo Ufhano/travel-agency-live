@@ -144,6 +144,10 @@ export interface GroupBookingWithPassengers extends GroupBooking {
 export interface GroupBookingListItem extends GroupBooking {
   tripName: string;
   passengerCount: number;
+  /** Package per person × passenger count (expected group total). */
+  totalExpected: number;
+  /** Sum of passenger amountPaid. */
+  totalPaid: number;
 }
 
 /** Group-split passenger shown on a trip departure page. */
