@@ -909,6 +909,83 @@ export async function recordPassengerPayment(
   };
 }
 
+export type UpdateGroupPackagePriceResult =
+  | { ok: true; packagePrice: number; groupStatus: GroupBookingStatus }
+  | { ok: false; error: string };
+
+/** Set the same package price for every passenger on a group booking. */
+export async function updateGroupBookingPackagePrice(
+  sql: SqlExecutor,
+  tenantId: string,
+  groupBookingId: string,
+  packagePriceRaw: number,
+): Promise<UpdateGroupPackagePriceResult> {
+  await ensureGroupBookingBalancesSchema(sql);
+
+  const packagePrice = Math.round(packagePriceRaw);
+  if (!Number.isFinite(packagePrice) || packagePrice <= 0) {
+    return { ok: false, error: "Package price must be a positive amount." };
+  }
+
+  const bookingRows = (await sql`
+    SELECT id FROM group_bookings
+    WHERE id = ${groupBookingId} AND tenant_id = ${tenantId}
+    LIMIT 1
+  `) as { id: string }[];
+  if (!bookingRows[0]) {
+    return { ok: false, error: "Group booking not found." };
+  }
+
+  const passengerRows = (await sql`
+    SELECT
+      COALESCE(package_price, amount) AS package_price,
+      COALESCE(amount_paid, 0) AS amount_paid,
+      amount
+    FROM group_booking_passengers
+    WHERE group_booking_id = ${groupBookingId}
+  `) as {
+    package_price: number | string;
+    amount_paid: number | string;
+    amount: number | string;
+  }[];
+
+  if (passengerRows.length === 0) {
+    return { ok: false, error: "This group booking has no passengers." };
+  }
+
+  const maxPaid = Math.max(
+    ...passengerRows.map((r) => Number(r.amount_paid ?? 0)),
+  );
+  if (packagePrice < maxPaid) {
+    return {
+      ok: false,
+      error: `Package price cannot be less than the highest amount already paid (${maxPaid}).`,
+    };
+  }
+
+  await sql`
+    UPDATE group_booking_passengers
+    SET package_price = ${packagePrice}
+    WHERE group_booking_id = ${groupBookingId}
+  `;
+
+  const groupStatus = computeGroupBookingStatus(
+    passengerRows.map((r) => ({
+      packagePrice,
+      amountPaid: Number(r.amount_paid ?? 0),
+    })),
+  );
+
+  await sql`
+    UPDATE group_bookings
+    SET status = ${groupStatus}
+    WHERE id = ${groupBookingId}
+      AND tenant_id = ${tenantId}
+  `;
+
+  return { ok: true, packagePrice, groupStatus };
+}
+
 export async function listGroupBookingFollowUpPayments(
   sql: SqlExecutor,
   tenantId: string,

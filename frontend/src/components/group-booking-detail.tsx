@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ExternalLink,
+  Loader2,
+  Pencil,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -40,6 +48,164 @@ function statusBadgeVariant(
 
 function passengerBalance(passenger: GroupBookingPassenger): number {
   return Math.max(0, passenger.packagePrice - passenger.amountPaid);
+}
+
+function EditablePackagePerPerson({
+  groupBookingId,
+  packagePrice,
+  onUpdated,
+}: {
+  groupBookingId: string;
+  packagePrice: number;
+  onUpdated: (next: {
+    packagePrice: number;
+    groupBooking: GroupBookingWithPassengers;
+  }) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(packagePrice));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(String(packagePrice));
+  }, [packagePrice, editing]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function cancel() {
+    setDraft(String(packagePrice));
+    setError(null);
+    setEditing(false);
+  }
+
+  async function commit() {
+    const next = Math.round(Number(draft));
+    if (!Number.isFinite(next) || next <= 0) {
+      setError("Enter a positive amount.");
+      return;
+    }
+    if (next === packagePrice) {
+      setEditing(false);
+      setError(null);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/group-bookings/${groupBookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packagePricePerPerson: next }),
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        packagePrice?: number;
+        groupBooking?: GroupBookingWithPassengers;
+        error?: string;
+      };
+      if (!res.ok || !json.groupBooking || json.packagePrice == null) {
+        setError(json.error ?? `Failed to save (HTTP ${res.status}).`);
+        return;
+      }
+      onUpdated({
+        packagePrice: json.packagePrice,
+        groupBooking: json.groupBooking,
+      });
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Network error.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="group mt-1 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-lg font-semibold tabular-nums hover:underline"
+          title="Click to edit package price"
+        >
+          {formatZAR(packagePrice)}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Edit package per person"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1 space-y-1">
+      <div className="flex items-center gap-1">
+        <Input
+          ref={inputRef}
+          type="number"
+          min={1}
+          step={1}
+          inputMode="numeric"
+          value={draft}
+          disabled={saving}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void commit();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancel();
+            }
+          }}
+          className="h-8 w-[7.5rem] tabular-nums"
+          aria-label="Package price per person"
+        />
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void commit()}
+          className="shrink-0 rounded p-1 text-emerald-700 hover:bg-muted disabled:opacity-50"
+          aria-label="Save package price"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={cancel}
+          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted"
+          aria-label="Cancel"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {error ? (
+        <p className="text-[11px] text-destructive" role="alert">
+          {error}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          Applies to all passengers
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string }) {
@@ -123,6 +289,8 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
     paymentsByPassenger.set(payment.passengerId, list);
   }
 
+  const packagePerPerson = groupBooking.passengers[0]?.packagePrice;
+
   return (
     <div className="space-y-6">
       {error ? (
@@ -160,11 +328,17 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Package per person
             </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {groupBooking.passengers[0]
-                ? formatZAR(groupBooking.passengers[0].packagePrice)
-                : "—"}
-            </p>
+            {packagePerPerson != null ? (
+              <EditablePackagePerPerson
+                groupBookingId={groupBookingId}
+                packagePrice={packagePerPerson}
+                onUpdated={({ groupBooking: next }) => {
+                  setGroupBooking(next);
+                }}
+              />
+            ) : (
+              <p className="mt-1 text-lg font-semibold tabular-nums">—</p>
+            )}
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -280,6 +454,7 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
                         <TableRow>
                           <TableHead>Date</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
+                          <TableHead>Note</TableHead>
                           <TableHead>Proof</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -290,13 +465,16 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
                             <TableCell className="text-right tabular-nums">
                               {formatZAR(payment.amount)}
                             </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {payment.note || "—"}
+                            </TableCell>
                             <TableCell>
                               {payment.proofFileName ? (
                                 <a
                                   href={`/api/group-bookings/${groupBookingId}/passengers/${p.id}/payments/${payment.id}/proof`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-sm text-primary hover:underline"
+                                  className="text-primary hover:underline"
                                 >
                                   {payment.proofFileName}
                                 </a>
