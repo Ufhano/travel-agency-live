@@ -1,4 +1,6 @@
 import type { Trip } from "./types";
+import { parseDepartureFromGroupLabel } from "./match-trip";
+import { shiftEmbeddedDatesInLabel } from "./shift-trip-label-dates";
 
 type SqlExecutor = (
   strings: TemplateStringsArray,
@@ -16,6 +18,64 @@ export type UpdateTripInput = {
 export type TripPatch = Partial<
   Pick<Trip, "name" | "destination" | "departureDate" | "packagePrice">
 >;
+
+function isoDateSlice(value: unknown): string {
+  if (value instanceof Date) {
+    /* Neon DATE values arrive as local-midnight Date objects. Using toISOString()
+       shifts the calendar day west of UTC (e.g. SAST). Prefer local Y-M-D. */
+    const y = value.getFullYear();
+    const m = value.getMonth() + 1;
+    const d = value.getDate();
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  return String(value).slice(0, 10);
+}
+
+/**
+ * Keep trip title text and traveller balance-due dates aligned when the
+ * departure moves (invoices render trip.name, so embedded years matter).
+ */
+export function syncTripFieldsForDepartureChange(input: {
+  name: string;
+  destination: string;
+  oldDepartureDate: string;
+  newDepartureDate: string;
+}): {
+  name: string;
+  destination: string;
+  balanceDueDatesToRewrite: string[];
+} {
+  const { oldDepartureDate, newDepartureDate } = input;
+  let { name, destination } = input;
+
+  const nameParsed = parseDepartureFromGroupLabel(name);
+  const destParsed = parseDepartureFromGroupLabel(destination);
+  const shiftFrom =
+    nameParsed ?? destParsed ?? oldDepartureDate;
+
+  const balanceDueDatesToRewrite = new Set<string>();
+  if (oldDepartureDate !== newDepartureDate) {
+    balanceDueDatesToRewrite.add(oldDepartureDate);
+  }
+  if (nameParsed && nameParsed !== newDepartureDate) {
+    balanceDueDatesToRewrite.add(nameParsed);
+  }
+
+  if (shiftFrom !== newDepartureDate) {
+    name = shiftEmbeddedDatesInLabel(name, shiftFrom, newDepartureDate);
+    destination = shiftEmbeddedDatesInLabel(
+      destination,
+      shiftFrom,
+      newDepartureDate,
+    );
+  }
+
+  return {
+    name,
+    destination,
+    balanceDueDatesToRewrite: [...balanceDueDatesToRewrite],
+  };
+}
 
 export function parseUpdateTripInput(
   body: UpdateTripInput,
@@ -95,15 +155,30 @@ export async function updateTripInNeon(
   const row = existing[0];
   if (!row) return null;
 
-  const name = patch.name ?? row.name;
-  const destination = patch.destination ?? row.destination;
-  const departureDate = patch.departureDate ?? String(row.departure_date).slice(0, 10);
+  const oldDepartureDate = isoDateSlice(row.departure_date);
+  let name = patch.name ?? row.name;
+  let destination = patch.destination ?? row.destination;
+  const departureDate = patch.departureDate ?? oldDepartureDate;
   const packagePrice =
     patch.packagePrice !== undefined
       ? patch.packagePrice
       : row.public_package_price != null && Number(row.public_package_price) > 0
         ? Number(row.public_package_price)
         : null;
+
+  let balanceDueDatesToRewrite: string[] = [];
+  if (patch.departureDate !== undefined) {
+    const synced = syncTripFieldsForDepartureChange({
+      name,
+      destination,
+      oldDepartureDate,
+      newDepartureDate: departureDate,
+    });
+    /* Only auto-rewrite labels when the caller did not explicitly rename. */
+    if (patch.name === undefined) name = synced.name;
+    if (patch.destination === undefined) destination = synced.destination;
+    balanceDueDatesToRewrite = synced.balanceDueDatesToRewrite;
+  }
 
   await sql`
     UPDATE trips
@@ -114,6 +189,17 @@ export async function updateTripInNeon(
       public_package_price = ${packagePrice}
     WHERE id = ${id} AND tenant_id = ${tenantId}
   `;
+
+  for (const oldDue of balanceDueDatesToRewrite) {
+    if (oldDue === departureDate) continue;
+    await sql`
+      UPDATE clients
+      SET balance_due_date = ${departureDate}
+      WHERE trip_id = ${id}
+        AND tenant_id = ${tenantId}
+        AND balance_due_date = ${oldDue}
+    `;
+  }
 
   return {
     id: row.id,

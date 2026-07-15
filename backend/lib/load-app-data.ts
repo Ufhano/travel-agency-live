@@ -194,8 +194,14 @@ type PaymentRow = {
 };
 
 function isoDateSlice(value: string | Date): string {
-  const s = typeof value === "string" ? value : value.toISOString();
-  return sanitizeIsoYear(s.length >= 10 ? s.slice(0, 10) : s);
+  if (typeof value !== "string") {
+    const y = value.getFullYear();
+    const m = value.getMonth() + 1;
+    const d = value.getDate();
+    const local = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    return sanitizeIsoYear(local);
+  }
+  return sanitizeIsoYear(value.length >= 10 ? value.slice(0, 10) : value);
 }
 
 function isoDateTime(value: string | Date): string {

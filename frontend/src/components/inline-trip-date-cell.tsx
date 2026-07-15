@@ -49,11 +49,6 @@ export function InlineTripDateCell({
       setError("Pick a date.");
       return;
     }
-    if (draft === initial) {
-      setEditing(false);
-      setError(null);
-      return;
-    }
 
     setSaving(true);
     setError(null);
