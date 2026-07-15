@@ -89,8 +89,8 @@ export function DashboardDeparturesSection({ rows }: Props) {
                     colSpan={6}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
-                    No departures with saved travellers yet. Import a spreadsheet or add
-                    clients to a trip to see them here.
+                    No departures with saved travellers yet. Import a spreadsheet,
+                    add clients, or create a group split on a trip to see them here.
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
