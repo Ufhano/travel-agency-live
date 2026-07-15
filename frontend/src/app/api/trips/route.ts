@@ -8,7 +8,11 @@ import {
 } from "@backend/data";
 import { memoryTripBelongsToTenant } from "@backend/tenant-access";
 import { createTripInNeon, parseCreateTripInput } from "@backend/trip-save";
-import { parseUpdateTripInput, updateTripInNeon } from "@backend/trip-update";
+import {
+  parseUpdateTripInput,
+  syncTripFieldsForDepartureChange,
+  updateTripInNeon,
+} from "@backend/trip-update";
 import type { Trip } from "@backend/types";
 import { getSession } from "@/lib/auth-server";
 
@@ -88,15 +92,20 @@ export async function GET() {
     departure_date: string;
   }[];
 
-  const trips = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    destination: r.destination,
-    departureDate:
+  const trips = rows.map((r) => {
+    const departureDate =
       typeof r.departure_date === "string"
         ? r.departure_date.slice(0, 10)
-        : String(r.departure_date).slice(0, 10),
-  }));
+        : r.departure_date instanceof Date
+          ? `${r.departure_date.getFullYear()}-${String(r.departure_date.getMonth() + 1).padStart(2, "0")}-${String(r.departure_date.getDate()).padStart(2, "0")}`
+          : String(r.departure_date).slice(0, 10);
+    return {
+      id: r.id,
+      name: r.name,
+      destination: r.destination,
+      departureDate,
+    };
+  });
 
   return NextResponse.json({ trips, mode: "neon" as const });
 }
@@ -137,9 +146,39 @@ export async function PATCH(request: Request): Promise<Response> {
       return NextResponse.json({ error: "Trip not found." }, { status: 404 });
     }
     const cur = memoryTrips[ix]!;
+    let name = patch.name ?? cur.name;
+    let destination = patch.destination ?? cur.destination;
+    const departureDate = patch.departureDate ?? cur.departureDate;
+
+    if (patch.departureDate !== undefined) {
+      const synced = syncTripFieldsForDepartureChange({
+        name,
+        destination,
+        oldDepartureDate: cur.departureDate,
+        newDepartureDate: departureDate,
+      });
+      if (patch.name === undefined) name = synced.name;
+      if (patch.destination === undefined) destination = synced.destination;
+
+      for (const oldDue of synced.balanceDueDatesToRewrite) {
+        if (oldDue === departureDate) continue;
+        for (const client of memoryClients) {
+          if (
+            client.tripId === id &&
+            client.balanceDueDate.slice(0, 10) === oldDue
+          ) {
+            client.balanceDueDate = departureDate;
+          }
+        }
+      }
+    }
+
     const updated: Trip = {
       ...cur,
       ...patch,
+      name,
+      destination,
+      departureDate,
     };
     memoryTrips[ix] = updated;
     return NextResponse.json({ ok: true, trip: updated });

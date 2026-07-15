@@ -38,6 +38,17 @@ function isoDateSlice(value: unknown): string {
   return String(value).slice(0, 10);
 }
 
+/** Neon DATE values arrive as local-midnight Dates — avoid UTC day shift. */
+function calendarDateSlice(value: unknown): string {
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = value.getMonth() + 1;
+    const d = value.getDate();
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 function parseGroupStatus(raw: string): GroupBookingStatus {
   if (raw === "Partial" || raw === "Complete") return raw;
   return "Pending";
@@ -683,7 +694,7 @@ export async function listTenantGroupSplitPassengers(
     tripId: row.trip_id,
     tripName: row.trip_name,
     tripDestination: row.trip_destination,
-    departureDate: isoDateSlice(row.departure_date),
+    departureDate: calendarDateSlice(row.departure_date),
     passengerName: row.passenger_name,
     passengerEmail: row.passenger_email,
     passengerPhone: row.passenger_phone ?? "",
@@ -757,7 +768,7 @@ export async function getTenantGroupSplitPassengerById(
     tripId: row.trip_id,
     tripName: row.trip_name,
     tripDestination: row.trip_destination,
-    departureDate: isoDateSlice(row.departure_date),
+    departureDate: calendarDateSlice(row.departure_date),
     passengerName: row.passenger_name,
     passengerEmail: row.passenger_email,
     passengerPhone: row.passenger_phone ?? "",
