@@ -25,14 +25,25 @@ export async function renameTripLabel(
   return { ok: true };
 }
 
-/** Update a departure date (expects YYYY-MM-DD). */
-export async function updateTripDepartureDate(
+/** Update departure and optional return (both YYYY-MM-DD; return null clears it). */
+export async function updateTripDates(
   tripId: string,
   departureDate: string,
+  returnDate: string | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const trimmed = departureDate.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return { ok: false, error: "Pick a valid date." };
+    return { ok: false, error: "Pick a valid departure date." };
+  }
+  const ret = returnDate?.trim() ?? "";
+  if (ret && !/^\d{4}-\d{2}-\d{2}$/.test(ret)) {
+    return { ok: false, error: "Pick a valid return date." };
+  }
+  if (ret && ret < trimmed) {
+    return {
+      ok: false,
+      error: "Return date must be on or after the departure date.",
+    };
   }
 
   const res = await fetch("/api/trips", {
@@ -41,6 +52,7 @@ export async function updateTripDepartureDate(
     body: JSON.stringify({
       id: tripId,
       departureDate: trimmed,
+      returnDate: ret || null,
     }),
   });
   const data = (await res.json().catch(() => null)) as { error?: string } | null;

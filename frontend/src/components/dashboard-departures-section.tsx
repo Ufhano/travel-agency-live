@@ -15,13 +15,14 @@ import {
 import { TableSearchInput } from "@/components/table-search-input";
 import { TripStatusBadge } from "@/components/trip-status-badge";
 import { matchesSearch } from "@/lib/search-utils";
-import { formatDate, formatZAR } from "@/lib/utils";
+import { formatTripDates, formatZAR } from "@/lib/utils";
 
 export type DashboardDepartureRow = {
   tripId: string;
   tripName: string;
   destination: string;
   departureDate: string;
+  returnDate?: string | null;
   totalExpectedRevenue: number;
   totalPaid: number;
   outstanding: number;
@@ -40,7 +41,7 @@ export function DashboardDeparturesSection({ rows }: Props) {
       search,
       row.tripName,
       row.destination,
-      formatDate(row.departureDate),
+      formatTripDates(row.departureDate, row.returnDate),
       row.status,
     ),
   );
@@ -62,7 +63,7 @@ export function DashboardDeparturesSection({ rows }: Props) {
               <TableRow>
                 <TableHead>Trip</TableHead>
                 <TableHead className="hidden md:table-cell whitespace-nowrap">
-                  Departs
+                  Dates
                 </TableHead>
                 <TableHead className="text-right whitespace-normal min-w-[7.5rem] max-w-[10rem] align-bottom leading-tight">
                   Total amount
@@ -115,7 +116,7 @@ export function DashboardDeparturesSection({ rows }: Props) {
                       <div className="text-xs text-muted-foreground">{row.destination}</div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell whitespace-nowrap text-muted-foreground">
-                      {formatDate(row.departureDate)}
+                      {formatTripDates(row.departureDate, row.returnDate)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatZAR(row.totalExpectedRevenue)}
@@ -152,8 +153,10 @@ export function DashboardDeparturesSection({ rows }: Props) {
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Departure</span>
-                  <span className="text-foreground">{formatDate(row.departureDate)}</span>
+                  <span>Dates</span>
+                  <span className="text-foreground">
+                    {formatTripDates(row.departureDate, row.returnDate)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Total amount to be paid</span>

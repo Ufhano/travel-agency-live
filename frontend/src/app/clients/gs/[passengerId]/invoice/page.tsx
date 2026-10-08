@@ -77,6 +77,7 @@ export default async function GroupSplitPassengerInvoicePage({
         name,
         destination,
         departure_date,
+        return_date,
         capacity,
         status,
         accommodation_note,
@@ -89,6 +90,7 @@ export default async function GroupSplitPassengerInvoicePage({
       name: string;
       destination: string;
       departure_date: string | Date;
+      return_date: string | Date | null;
       capacity: number;
       status: Trip["status"];
       accommodation_note: string | null;
@@ -104,6 +106,12 @@ export default async function GroupSplitPassengerInvoicePage({
         row.departure_date instanceof Date
           ? row.departure_date.toISOString().slice(0, 10)
           : String(row.departure_date).slice(0, 10),
+      returnDate:
+        row.return_date == null
+          ? null
+          : row.return_date instanceof Date
+            ? row.return_date.toISOString().slice(0, 10)
+            : String(row.return_date).slice(0, 10),
       capacity: Number(row.capacity),
       status: row.status,
       accommodationNote: row.accommodation_note ?? "",

@@ -14,6 +14,7 @@ import {
 import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
 import { ClientRowActions } from "@/components/client-row-actions";
 import { GroupSplitBadge } from "@/components/group-split-badge";
+import { GroupSplitInlineName } from "@/components/group-split-inline-name";
 import { InlineTripNameCell } from "@/components/inline-trip-name-cell";
 import { DeleteClientsBulkButton } from "@/components/delete-clients-bulk-button";
 import { TableSearchInput } from "@/components/table-search-input";
@@ -160,15 +161,20 @@ export function ClientsDirectorySection({ destinationGroups, trips }: Props) {
                         return (
                           <TableRow key={`gs-${row.passengerId}`}>
                             <TableCell>
-                              <Link
-                                href={`/clients/gs/${row.passengerId}`}
-                                className="inline-flex items-center font-medium text-primary hover:underline"
-                              >
-                                {row.passengerName}
+                              <div className="inline-flex flex-wrap items-center gap-1 font-medium">
+                                <GroupSplitInlineName
+                                  passengerId={row.passengerId}
+                                  name={row.passengerName}
+                                />
                                 <GroupSplitBadge />
-                              </Link>
+                              </div>
                               <div className="text-xs text-muted-foreground">
-                                {row.referenceNumber}
+                                <Link
+                                  href={`/clients/gs/${row.passengerId}`}
+                                  className="hover:underline"
+                                >
+                                  {row.referenceNumber}
+                                </Link>
                               </div>
                               <div className="text-xs text-muted-foreground md:hidden">
                                 <InlineTripNameCell

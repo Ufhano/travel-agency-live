@@ -112,10 +112,11 @@ export default async function TripPage({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <TripStatusBadge status={status} />
             <Badge variant="outline" className="gap-1.5 font-normal">
-              <span className="text-muted-foreground">Departs</span>
+              <span className="text-muted-foreground">Dates</span>
               <InlineTripDateCell
                 tripId={agg.trip.id}
                 departureDate={agg.trip.departureDate}
+                returnDate={agg.trip.returnDate}
               />
             </Badge>
             <Badge variant="outline" className="gap-1.5 font-normal">

@@ -13,7 +13,7 @@ import {
 import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
 import { DeleteClientButton } from "@/components/delete-client-button";
 import { EditClientDialog } from "@/components/edit-client-dialog";
-import { formatDate } from "@/lib/utils";
+import { formatTripDates } from "@/lib/utils";
 import type { Client, Trip } from "@backend/types";
 
 export function ClientDetailToolbar({
@@ -68,9 +68,9 @@ export function ClientDetailToolbar({
             <p className="font-semibold text-foreground">{trip.name}</p>
             <p className="text-muted-foreground">{trip.destination}</p>
             <p className="text-muted-foreground">
-              Departs{" "}
+              Dates{" "}
               <span className="font-medium text-foreground">
-                {formatDate(trip.departureDate)}
+                {formatTripDates(trip.departureDate, trip.returnDate)}
               </span>
             </p>
           </div>

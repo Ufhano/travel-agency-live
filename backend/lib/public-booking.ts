@@ -6,6 +6,7 @@ import { getPublicTenantId } from "./public-config";
 import { centsToZar, createYocoCheckout, zarToCents } from "./yoco";
 import { metadataString, type YocoWebhookEvent } from "./yoco-webhook";
 import { sendBookingConfirmationEmail } from "./send-booking-confirmation-email";
+import { ensureTripReturnDateSchema } from "./trip-update";
 
 type SqlExecutor = (
   strings: TemplateStringsArray,
@@ -18,6 +19,7 @@ export type FeaturedTrip = {
   name: string;
   destination: string;
   departureDate: string;
+  returnDate: string | null;
   capacity: number;
   status: string;
   accommodationNote: string;
@@ -32,6 +34,7 @@ type TripRow = {
   name: string;
   destination: string;
   departure_date: string | Date;
+  return_date: string | Date | null;
   capacity: number;
   status: string;
   accommodation_note: string;
@@ -61,6 +64,8 @@ function mapTripRow(row: TripRow): FeaturedTrip | null {
     name: row.name,
     destination: row.destination,
     departureDate: isoDate(row.departure_date),
+    returnDate:
+      row.return_date == null ? null : isoDate(row.return_date),
     capacity: Number(row.capacity),
     status: row.status,
     accommodationNote: row.accommodation_note,
@@ -79,9 +84,10 @@ export async function getFeaturedTrip(
   sql: SqlExecutor,
   tenantId: string,
 ): Promise<FeaturedTrip | null> {
+  await ensureTripReturnDateSchema(sql);
   const featuredRows = (await sql`
     SELECT
-      id, tenant_id, name, destination, departure_date, capacity, status,
+      id, tenant_id, name, destination, departure_date, return_date, capacity, status,
       accommodation_note, public_package_price, hero_image_url, gallery_urls, is_featured
     FROM trips
     WHERE tenant_id = ${tenantId}
@@ -98,7 +104,7 @@ export async function getFeaturedTrip(
 
   const upcomingRows = (await sql`
     SELECT
-      id, tenant_id, name, destination, departure_date, capacity, status,
+      id, tenant_id, name, destination, departure_date, return_date, capacity, status,
       accommodation_note, public_package_price, hero_image_url, gallery_urls, is_featured
     FROM trips
     WHERE tenant_id = ${tenantId}

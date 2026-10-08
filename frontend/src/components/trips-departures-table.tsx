@@ -17,13 +17,14 @@ import { TableSearchInput } from "@/components/table-search-input";
 import { TripStatusBadge } from "@/components/trip-status-badge";
 import { DeleteTripButton } from "@/components/delete-trip-button";
 import { matchesSearch } from "@/lib/search-utils";
-import { formatDate, formatZAR } from "@/lib/utils";
+import { formatTripDates, formatZAR } from "@/lib/utils";
 
 export type TripDepartureRow = {
   tripId: string;
   tripName: string;
   destination: string;
   departureDate: string;
+  returnDate?: string | null;
   packagePrice: number | null;
   confirmedCount: number;
   capacity: number;
@@ -43,7 +44,7 @@ export function TripsDeparturesTable({ rows }: Props) {
       search,
       row.tripName,
       row.destination,
-      formatDate(row.departureDate),
+      formatTripDates(row.departureDate, row.returnDate),
       row.status,
     ),
   );
@@ -74,7 +75,7 @@ export function TripsDeparturesTable({ rows }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>Trip</TableHead>
-              <TableHead className="hidden md:table-cell">Departs</TableHead>
+              <TableHead className="hidden md:table-cell">Dates</TableHead>
               <TableHead className="hidden lg:table-cell text-right">Package</TableHead>
               <TableHead className="hidden sm:table-cell text-right">Travellers</TableHead>
               <TableHead className="text-right">Outstanding</TableHead>
@@ -126,6 +127,7 @@ export function TripsDeparturesTable({ rows }: Props) {
                     <InlineTripDateCell
                       tripId={row.tripId}
                       departureDate={row.departureDate}
+                      returnDate={row.returnDate}
                     />
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-right">

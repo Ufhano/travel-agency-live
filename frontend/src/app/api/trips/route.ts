@@ -8,6 +8,7 @@ import {
 } from "@backend/data";
 import { memoryTripBelongsToTenant } from "@backend/tenant-access";
 import { createTripInNeon, parseCreateTripInput } from "@backend/trip-save";
+import { rewriteLabelToDateRange } from "@backend/shift-trip-label-dates";
 import {
   parseUpdateTripInput,
   syncTripFieldsForDepartureChange,
@@ -149,6 +150,21 @@ export async function PATCH(request: Request): Promise<Response> {
     let name = patch.name ?? cur.name;
     let destination = patch.destination ?? cur.destination;
     const departureDate = patch.departureDate ?? cur.departureDate;
+    const returnDate =
+      patch.returnDate !== undefined ? patch.returnDate : (cur.returnDate ?? null);
+
+    if (returnDate && returnDate < departureDate) {
+      return NextResponse.json(
+        { error: "Return date must be on or after the departure date." },
+        { status: 400 },
+      );
+    }
+
+    const datesTouched =
+      patch.departureDate !== undefined || patch.returnDate !== undefined;
+    const useExplicitRange =
+      returnDate != null ||
+      (patch.returnDate === null && cur.returnDate != null);
 
     if (patch.departureDate !== undefined) {
       const synced = syncTripFieldsForDepartureChange({
@@ -157,8 +173,10 @@ export async function PATCH(request: Request): Promise<Response> {
         oldDepartureDate: cur.departureDate,
         newDepartureDate: departureDate,
       });
-      if (patch.name === undefined) name = synced.name;
-      if (patch.destination === undefined) destination = synced.destination;
+      if (!useExplicitRange) {
+        if (patch.name === undefined) name = synced.name;
+        if (patch.destination === undefined) destination = synced.destination;
+      }
 
       for (const oldDue of synced.balanceDueDatesToRewrite) {
         if (oldDue === departureDate) continue;
@@ -173,12 +191,26 @@ export async function PATCH(request: Request): Promise<Response> {
       }
     }
 
+    if (datesTouched && useExplicitRange) {
+      if (patch.name === undefined) {
+        name = rewriteLabelToDateRange(cur.name, departureDate, returnDate);
+      }
+      if (patch.destination === undefined) {
+        destination = rewriteLabelToDateRange(
+          cur.destination,
+          departureDate,
+          returnDate,
+        );
+      }
+    }
+
     const updated: Trip = {
       ...cur,
       ...patch,
       name,
       destination,
       departureDate,
+      returnDate,
     };
     memoryTrips[ix] = updated;
     return NextResponse.json({ ok: true, trip: updated });

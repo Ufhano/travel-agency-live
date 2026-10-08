@@ -8,6 +8,7 @@ import {
 } from "./invoice-terms";
 import { tripTenantById } from "./tenant-scope";
 import type { AppData } from "./app-data";
+import { ensureTripReturnDateSchema } from "./trip-update";
 import type { Client, Payment, Trip, TripStatus } from "./types";
 
 export type LoadAppDataResult = {
@@ -63,10 +64,11 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      await ensureTripReturnDateSchema(sql);
       const [tripRows, clientRows, paymentRows, invoiceTermsConfig] =
         await Promise.all([
       sql`
-        SELECT id, name, destination, departure_date, capacity, status, accommodation_note, public_package_price
+        SELECT id, name, destination, departure_date, return_date, capacity, status, accommodation_note, public_package_price
         FROM trips
         WHERE tenant_id = ${tenantId}
         ORDER BY departure_date ASC
@@ -90,6 +92,8 @@ export async function loadAppData(tenantId: string): Promise<LoadAppDataResult> 
       name: row.name,
       destination: row.destination,
       departureDate: isoDateSlice(row.departure_date),
+      returnDate:
+        row.return_date == null ? null : isoDateSlice(row.return_date),
       capacity: Number(row.capacity),
       status: row.status as TripStatus,
       accommodationNote: row.accommodation_note,
@@ -164,6 +168,7 @@ type TripRow = {
   name: string;
   destination: string;
   departure_date: string;
+  return_date: string | Date | null;
   capacity: number;
   status: string;
   accommodation_note: string;

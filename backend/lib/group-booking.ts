@@ -783,6 +783,7 @@ export async function getTenantGroupSplitPassengerById(
 }
 
 export type UpdateGroupSplitPassengerContactInput = {
+  passengerName?: string;
   passengerEmail?: string;
   passengerPhone?: string;
   passengerIdNumber?: string | null;
@@ -805,6 +806,12 @@ export async function updateGroupSplitPassengerContact(
     passengerId,
   );
   if (!existing) return { ok: false, error: "Passenger not found." };
+
+  const name =
+    input.passengerName !== undefined
+      ? input.passengerName.trim()
+      : existing.passengerName;
+  if (!name) return { ok: false, error: "Passenger name is required." };
 
   const email =
     input.passengerEmail !== undefined
@@ -830,6 +837,7 @@ export async function updateGroupSplitPassengerContact(
   await sql`
     UPDATE group_booking_passengers
     SET
+      passenger_name = ${name},
       passenger_email = ${email},
       passenger_phone = ${phone},
       passenger_id_number = ${idNumber}

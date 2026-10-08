@@ -17,6 +17,8 @@ export interface Trip {
   name: string;
   destination: string;
   departureDate: string;
+  /** Last day of the trip. Null when the departure is a single day. */
+  returnDate: string | null;
   capacity: number;
   /** Base workflow status from operations (some badges are computed separately). */
   status: TripStatus;

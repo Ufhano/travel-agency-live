@@ -5,7 +5,7 @@ import { PublicBookingForm } from "@/components/public-booking-form";
 import { getSql } from "@backend/db";
 import { getFeaturedTrip } from "@backend/public-booking";
 import { getPublicTenantId } from "@backend/public-config";
-import { formatDate, formatZAR } from "@/lib/utils";
+import { formatTripDates, formatZAR } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +52,10 @@ export default async function BookPage() {
 
           <dl className="grid grid-cols-2 gap-4 rounded-xl border bg-card p-4 text-sm">
             <div>
-              <dt className="text-muted-foreground">Departure</dt>
-              <dd className="font-semibold">{formatDate(trip.departureDate)}</dd>
+              <dt className="text-muted-foreground">Dates</dt>
+              <dd className="font-semibold">
+                {formatTripDates(trip.departureDate, trip.returnDate)}
+              </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Package price</dt>

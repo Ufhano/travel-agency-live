@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { shiftEmbeddedDatesInLabel } from "../lib/shift-trip-label-dates";
+import {
+  rewriteLabelToDateRange,
+  shiftEmbeddedDatesInLabel,
+} from "../lib/shift-trip-label-dates";
 import { syncTripFieldsForDepartureChange } from "../lib/trip-update";
 
 const cases: Array<[string, string, string, string]> = [
@@ -37,5 +40,30 @@ const normal = syncTripFieldsForDepartureChange({
 });
 assert.equal(normal.name, "Mozambique 08 - 11 October 2026");
 assert.ok(normal.balanceDueDatesToRewrite.includes("2025-10-08"));
+
+assert.equal(
+  rewriteLabelToDateRange(
+    "Vic Falls 12 - 16 October 2026",
+    "2026-10-26",
+    "2026-10-30",
+  ),
+  "Vic Falls 26 - 30 October 2026",
+);
+assert.equal(
+  rewriteLabelToDateRange("Victoria Falls", "2026-10-26", "2026-10-30"),
+  "Victoria Falls",
+);
+assert.equal(
+  rewriteLabelToDateRange("Vic Falls 12 - 16 October", "2026-10-26", "2026-10-30"),
+  "Vic Falls 26 - 30 October 2026",
+);
+assert.equal(
+  rewriteLabelToDateRange(
+    "Mozambique 08 - 11 October 2025",
+    "2026-10-26",
+    null,
+  ),
+  "Mozambique 26 October 2026",
+);
 
 console.log("All date-sync checks passed");
