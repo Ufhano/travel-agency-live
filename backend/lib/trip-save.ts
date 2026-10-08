@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import type { Trip, TripStatus } from "./types";
+import { ensureTripReturnDateSchema } from "./trip-update";
 
 type SqlExecutor = (
   strings: TemplateStringsArray,
@@ -30,6 +31,7 @@ export type CreateTripInput = {
   name?: unknown;
   destination?: unknown;
   departureDate?: unknown;
+  returnDate?: unknown;
   capacity?: unknown;
   status?: unknown;
   accommodationNote?: unknown;
@@ -56,6 +58,27 @@ export function parseCreateTripInput(
     departureDate && /^\d{4}-\d{2}-\d{2}$/.test(departureDate)
       ? departureDate
       : defaultDepartureDate();
+
+  let returnDate: string | null = null;
+  if (body.returnDate != null && body.returnDate !== "") {
+    const raw = typeof body.returnDate === "string" ? body.returnDate.trim() : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return { ok: false, error: "Return date must be YYYY-MM-DD." };
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(departureDate)) {
+      return {
+        ok: false,
+        error: "Pick a departure date when you set a return date.",
+      };
+    }
+    if (raw < dep) {
+      return {
+        ok: false,
+        error: "Return date must be on or after the departure date.",
+      };
+    }
+    returnDate = raw;
+  }
 
   const capRaw =
     typeof body.capacity === "number"
@@ -88,6 +111,7 @@ export function parseCreateTripInput(
       name,
       destination,
       departureDate: dep,
+      returnDate,
       capacity,
       status,
       accommodationNote,
@@ -102,9 +126,10 @@ export async function createTripInNeon(
   input: Omit<Trip, "id">,
 ): Promise<Trip> {
   const tripId = id("t");
+  await ensureTripReturnDateSchema(sql);
   await sql`
     INSERT INTO trips
-      (id, tenant_id, name, destination, departure_date, capacity, status, accommodation_note, public_package_price)
+      (id, tenant_id, name, destination, departure_date, return_date, capacity, status, accommodation_note, public_package_price)
     VALUES
       (
         ${tripId},
@@ -112,6 +137,7 @@ export async function createTripInNeon(
         ${input.name},
         ${input.destination},
         ${input.departureDate},
+        ${input.returnDate},
         ${input.capacity},
         ${input.status},
         ${input.accommodationNote},

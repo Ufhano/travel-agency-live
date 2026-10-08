@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS trips (
   name TEXT NOT NULL,
   destination TEXT NOT NULL,
   departure_date DATE NOT NULL,
+  return_date DATE,
   capacity INTEGER NOT NULL,
   status TEXT NOT NULL,
   accommodation_note TEXT NOT NULL,

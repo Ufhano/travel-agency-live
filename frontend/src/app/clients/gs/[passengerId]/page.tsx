@@ -16,6 +16,7 @@ import { DbConnectionBanner } from "@/components/db-connection-banner";
 import { DeleteGroupSplitPassengerButton } from "@/components/delete-group-split-passenger-button";
 import { DeleteGroupSplitPaymentButton } from "@/components/delete-group-split-payment-button";
 import { GroupSplitBadge } from "@/components/group-split-badge";
+import { GroupSplitInlineName } from "@/components/group-split-inline-name";
 import { GroupSplitInlineContactField } from "@/components/group-split-inline-contact-field";
 import { GroupSplitInvoicePicker } from "@/components/group-split-invoice-picker";
 import { GroupSplitPassengerPaymentCard } from "@/components/group-split-passenger-payment-card";
@@ -129,7 +130,10 @@ export default async function GroupSplitPassengerPage({
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="inline-flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            {passenger.passengerName}
+            <GroupSplitInlineName
+              passengerId={passenger.id}
+              name={passenger.passengerName}
+            />
             <GroupSplitBadge />
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1">

@@ -1,6 +1,9 @@
 import type { Trip } from "./types";
 import { parseDepartureFromGroupLabel } from "./match-trip";
-import { shiftEmbeddedDatesInLabel } from "./shift-trip-label-dates";
+import {
+  rewriteLabelToDateRange,
+  shiftEmbeddedDatesInLabel,
+} from "./shift-trip-label-dates";
 
 type SqlExecutor = (
   strings: TemplateStringsArray,
@@ -12,12 +15,22 @@ export type UpdateTripInput = {
   name?: unknown;
   destination?: unknown;
   departureDate?: unknown;
+  returnDate?: unknown;
   packagePrice?: unknown;
 };
 
 export type TripPatch = Partial<
-  Pick<Trip, "name" | "destination" | "departureDate" | "packagePrice">
+  Pick<
+    Trip,
+    "name" | "destination" | "departureDate" | "returnDate" | "packagePrice"
+  >
 >;
+
+export async function ensureTripReturnDateSchema(
+  sql: SqlExecutor,
+): Promise<void> {
+  await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS return_date DATE`;
+}
 
 function isoDateSlice(value: unknown): string {
   if (value instanceof Date) {
@@ -107,6 +120,19 @@ export function parseUpdateTripInput(
     patch.departureDate = departureDate;
   }
 
+  if (body.returnDate !== undefined) {
+    if (body.returnDate === null || body.returnDate === "") {
+      patch.returnDate = null;
+    } else {
+      const returnDate =
+        typeof body.returnDate === "string" ? body.returnDate.trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(returnDate)) {
+        return { ok: false, error: "Return date must be YYYY-MM-DD." };
+      }
+      patch.returnDate = returnDate;
+    }
+  }
+
   if (body.packagePrice !== undefined) {
     if (body.packagePrice === null || body.packagePrice === "") {
       patch.packagePrice = null;
@@ -138,14 +164,17 @@ export async function updateTripInNeon(
   id: string,
   patch: TripPatch,
 ): Promise<Trip | null> {
+  await ensureTripReturnDateSchema(sql);
+
   const existing = (await sql`
-    SELECT id, name, destination, departure_date, capacity, status, accommodation_note, public_package_price
+    SELECT id, name, destination, departure_date, return_date, capacity, status, accommodation_note, public_package_price
     FROM trips WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1
   `) as Array<{
     id: string;
     name: string;
     destination: string;
     departure_date: string;
+    return_date: string | Date | null;
     capacity: number;
     status: string;
     accommodation_note: string;
@@ -156,15 +185,31 @@ export async function updateTripInNeon(
   if (!row) return null;
 
   const oldDepartureDate = isoDateSlice(row.departure_date);
+  const existingReturn =
+    row.return_date == null ? null : isoDateSlice(row.return_date);
   let name = patch.name ?? row.name;
   let destination = patch.destination ?? row.destination;
   const departureDate = patch.departureDate ?? oldDepartureDate;
+  const returnDate =
+    patch.returnDate !== undefined ? patch.returnDate : existingReturn;
   const packagePrice =
     patch.packagePrice !== undefined
       ? patch.packagePrice
       : row.public_package_price != null && Number(row.public_package_price) > 0
         ? Number(row.public_package_price)
         : null;
+
+  if (returnDate && returnDate < departureDate) {
+    throw new Error("Return date must be on or after the departure date.");
+  }
+
+  const datesTouched =
+    patch.departureDate !== undefined || patch.returnDate !== undefined;
+  /* An explicit end date rewrites the title. Clearing a saved end date
+     collapses it. A missing end date keeps the old same-length shift. */
+  const useExplicitRange =
+    returnDate != null ||
+    (patch.returnDate === null && existingReturn != null);
 
   let balanceDueDatesToRewrite: string[] = [];
   if (patch.departureDate !== undefined) {
@@ -174,10 +219,25 @@ export async function updateTripInNeon(
       oldDepartureDate,
       newDepartureDate: departureDate,
     });
-    /* Only auto-rewrite labels when the caller did not explicitly rename. */
-    if (patch.name === undefined) name = synced.name;
-    if (patch.destination === undefined) destination = synced.destination;
     balanceDueDatesToRewrite = synced.balanceDueDatesToRewrite;
+    /* Keep a same-length title range when only the start day moves. */
+    if (!useExplicitRange) {
+      if (patch.name === undefined) name = synced.name;
+      if (patch.destination === undefined) destination = synced.destination;
+    }
+  }
+
+  if (datesTouched && useExplicitRange) {
+    if (patch.name === undefined) {
+      name = rewriteLabelToDateRange(row.name, departureDate, returnDate);
+    }
+    if (patch.destination === undefined) {
+      destination = rewriteLabelToDateRange(
+        row.destination,
+        departureDate,
+        returnDate,
+      );
+    }
   }
 
   await sql`
@@ -186,6 +246,7 @@ export async function updateTripInNeon(
       name = ${name},
       destination = ${destination},
       departure_date = ${departureDate},
+      return_date = ${returnDate},
       public_package_price = ${packagePrice}
     WHERE id = ${id} AND tenant_id = ${tenantId}
   `;
@@ -206,6 +267,7 @@ export async function updateTripInNeon(
     name,
     destination,
     departureDate,
+    returnDate,
     capacity: row.capacity,
     status: row.status as Trip["status"],
     accommodationNote: row.accommodation_note,

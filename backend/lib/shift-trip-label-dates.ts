@@ -276,3 +276,47 @@ export function shiftEmbeddedDatesInLabel(
 
   return out;
 }
+
+function pad2(day: number): string {
+  return String(day).padStart(2, "0");
+}
+
+function formatExplicitRange(startIso: string, endIso: string | null): string | null {
+  const start = parseIso(startIso);
+  if (!start) return null;
+  const end =
+    endIso && endIso !== startIso ? parseIso(endIso) : null;
+  const startMonth = MONTH_NAMES[start.m - 1];
+  if (!startMonth) return null;
+  if (!end || (end.y === start.y && end.m === start.m && end.d === start.d)) {
+    return `${pad2(start.d)} ${startMonth} ${start.y}`;
+  }
+  const endMonth = MONTH_NAMES[end.m - 1];
+  if (!endMonth) return null;
+  if (end.y === start.y && end.m === start.m) {
+    return `${pad2(start.d)} - ${pad2(end.d)} ${startMonth} ${start.y}`;
+  }
+  return `${pad2(start.d)} ${startMonth} ${start.y} - ${pad2(end.d)} ${endMonth} ${end.y}`;
+}
+
+const LABEL_DATE_RE = new RegExp(
+  `\\b(?:\\d{1,2}\\s*[-–—]\\s*\\d{1,2}\\s+(?:${MONTH_PATTERN})\\s*,?\\s*\\d{4}|(?:${MONTH_PATTERN})\\s+\\d{1,2}\\s*[-–—]\\s*\\d{1,2}\\s*,?\\s*\\d{4}|\\d{1,2}\\s+(?:${MONTH_PATTERN})\\s*,?\\s*\\d{4}|(?:${MONTH_PATTERN})\\s+\\d{1,2}\\s*,?\\s*\\d{4}|\\d{1,2}\\s*[-–—]\\s*\\d{1,2}\\s+(?:${MONTH_PATTERN})|(?:${MONTH_PATTERN})\\s+\\d{1,2}\\s*[-–—]\\s*\\d{1,2})\\b`,
+  "i",
+);
+
+/**
+ * Replace the first calendar date or stay in a trip title with an explicit
+ * range (e.g. "Vic Falls 12 - 16 October 2026" → "… 26 - 30 October 2026").
+ * Titles with no date are left unchanged.
+ */
+export function rewriteLabelToDateRange(
+  label: string,
+  startIso: string,
+  endIso: string | null,
+): string {
+  if (!label.trim()) return label;
+  const next = formatExplicitRange(startIso, endIso);
+  if (!next) return label;
+  if (!LABEL_DATE_RE.test(label)) return label;
+  return label.replace(LABEL_DATE_RE, next);
+}

@@ -10,7 +10,7 @@ import { createCompute } from "@backend/compute";
 import { getSql } from "@backend/db";
 import { summarizeGroupSplitByTrip } from "@backend/group-booking";
 import { loadAppDataForPage } from "@/lib/page-data";
-import { formatDate, formatZAR } from "@/lib/utils";
+import { formatDate, formatTripDates, formatZAR } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +70,7 @@ export default async function DashboardPage() {
     tripName: agg.trip.name,
     destination: agg.trip.destination,
     departureDate: agg.trip.departureDate,
+    returnDate: agg.trip.returnDate,
     totalExpectedRevenue: agg.totalExpectedRevenue,
     totalPaid: agg.totalPaid,
     outstanding: agg.outstanding,

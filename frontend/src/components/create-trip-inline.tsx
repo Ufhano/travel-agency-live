@@ -12,6 +12,7 @@ export type TripOption = {
   name: string;
   destination: string;
   departureDate: string;
+  returnDate?: string | null;
   packagePrice?: number | null;
 };
 
@@ -31,6 +32,7 @@ export function CreateTripInline({
     defaultDestination || defaultName,
   );
   const [departureDate, setDepartureDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
   const [packagePrice, setPackagePrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,21 @@ export function CreateTripInline({
         setSubmitting(false);
         return;
       }
+      if (returnDate && !departureDate) {
+        setError("Pick a departure date when you set a return date.");
+        setSubmitting(false);
+        return;
+      }
+      if (returnDate && !departureDate) {
+        setError("Set a departure date before a return date.");
+        setSubmitting(false);
+        return;
+      }
+      if (returnDate && departureDate && returnDate < departureDate) {
+        setError("Return date must be on or after the departure date.");
+        setSubmitting(false);
+        return;
+      }
       const res = await fetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,6 +74,7 @@ export function CreateTripInline({
           name,
           destination,
           departureDate: departureDate || undefined,
+          returnDate: returnDate || null,
           capacity: 40,
           status: "Open",
           packagePrice:
@@ -76,6 +94,7 @@ export function CreateTripInline({
       setName(defaultName);
       setDestination(defaultDestination || defaultName);
       setDepartureDate("");
+      setReturnDate("");
       setPackagePrice("");
     } catch {
       setError("Could not reach the server.");
@@ -114,12 +133,21 @@ export function CreateTripInline({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="new-trip-date">Departure date (optional)</Label>
+          <Label htmlFor="new-trip-date">Departs (optional)</Label>
           <Input
             id="new-trip-date"
             type="date"
             value={departureDate}
             onChange={(e) => setDepartureDate(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="new-trip-return">Returns (optional)</Label>
+          <Input
+            id="new-trip-return"
+            type="date"
+            value={returnDate}
+            onChange={(e) => setReturnDate(e.target.value)}
           />
         </div>
         <div className="space-y-1.5">

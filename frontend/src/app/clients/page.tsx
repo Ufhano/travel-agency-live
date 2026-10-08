@@ -63,6 +63,7 @@ export default async function ClientsPage() {
         name: p.tripName,
         destination: p.tripDestination,
         departureDate: p.departureDate,
+        returnDate: null,
         capacity: 0,
         status: "Open",
         accommodationNote: "",

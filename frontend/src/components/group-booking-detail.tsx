@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClientFullyPaidBadge } from "@/components/client-fully-paid-badge";
+import { GroupSplitInlineName } from "@/components/group-split-inline-name";
 import { RecordGroupSplitPaymentForm } from "@/components/record-group-split-payment-form";
 import { formatDate, formatZAR } from "@/lib/utils";
 import type {
@@ -392,7 +393,8 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
         <CardHeader>
           <CardTitle className="text-base">Passengers</CardTitle>
           <CardDescription>
-            Record payments until each passenger&apos;s balance is cleared.
+            Click a name to correct a spelling. Record payments until each
+            passenger&apos;s balance is cleared.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
@@ -408,7 +410,25 @@ export function GroupBookingDetail({ groupBookingId }: { groupBookingId: string 
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium">{p.passengerName}</p>
+                    <GroupSplitInlineName
+                      passengerId={p.id}
+                      name={p.passengerName}
+                      className="font-medium"
+                      onSaved={(passengerName) => {
+                        setGroupBooking((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                passengers: prev.passengers.map((row) =>
+                                  row.id === p.id
+                                    ? { ...row, passengerName }
+                                    : row,
+                                ),
+                              }
+                            : prev,
+                        );
+                      }}
+                    />
                     {p.passengerEmail ? (
                       <p className="text-sm text-muted-foreground">
                         {p.passengerEmail}

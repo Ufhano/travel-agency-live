@@ -363,6 +363,7 @@ export function AllocatePaymentForm({
                   name: trip.name,
                   destination: trip.destination,
                   departureDate: trip.departureDate,
+                  returnDate: trip.returnDate ?? null,
                   capacity: 40,
                   status: "Open",
                   accommodationNote: "",

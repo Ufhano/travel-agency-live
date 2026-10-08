@@ -32,16 +32,23 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   const raw = body as {
+    passengerName?: unknown;
     passengerEmail?: unknown;
     passengerPhone?: unknown;
     passengerIdNumber?: unknown;
   };
 
   const input: {
+    passengerName?: string;
     passengerEmail?: string;
     passengerPhone?: string;
     passengerIdNumber?: string | null;
   } = {};
+
+  if (raw.passengerName !== undefined) {
+    input.passengerName =
+      typeof raw.passengerName === "string" ? raw.passengerName : "";
+  }
 
   if (raw.passengerEmail !== undefined) {
     input.passengerEmail =

@@ -89,6 +89,7 @@ export async function ensureTripsForImportGroups(
       name: group,
       destination: destinationFromGroupLabel(group),
       departureDate,
+      returnDate: null,
       capacity: 40,
       status: "Open",
       accommodationNote: "",

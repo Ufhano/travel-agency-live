@@ -47,6 +47,51 @@ export function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
+const SHORT_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+function isoParts(iso: string): { y: number; m: number; d: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  if (!match) return null;
+  return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
+}
+
+/** "26 Oct 2026", or "26–30 Oct 2026" when the trip has a return day. */
+export function formatTripDates(
+  departureIso: string,
+  returnIso?: string | null,
+): string {
+  const start = isoParts(departureIso);
+  if (!start) return formatDate(departureIso);
+  const end = returnIso ? isoParts(returnIso) : null;
+  const startMonth = SHORT_MONTHS[start.m - 1];
+  if (
+    !end ||
+    !startMonth ||
+    (end.y === start.y && end.m === start.m && end.d === start.d)
+  ) {
+    return formatDate(departureIso);
+  }
+  const endMonth = SHORT_MONTHS[end.m - 1];
+  if (!endMonth) return formatDate(departureIso);
+  if (end.y === start.y && end.m === start.m) {
+    return `${start.d}–${end.d} ${startMonth} ${start.y}`;
+  }
+  return `${start.d} ${startMonth} ${start.y} – ${end.d} ${endMonth} ${end.y}`;
+}
+
 export function formatDateLong(iso: string): string {
   return new Intl.DateTimeFormat('en-ZA', {
     year: 'numeric',
