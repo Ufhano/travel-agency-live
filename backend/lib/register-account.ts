@@ -30,7 +30,18 @@ function hashToken(token: string): string {
 }
 
 export type RegisterResult =
-  | { ok: true; email: string }
+  | {
+      ok: true;
+      email: string;
+      signedIn: boolean;
+      user?: {
+        id: string;
+        tenantId: string;
+        username: string;
+        displayName: string;
+        role: "admin" | "user";
+      };
+    }
   | { ok: false; status: number; error: string };
 
 export async function registerAccount(
@@ -86,12 +97,24 @@ export async function registerAccount(
   try {
     const sent = await sendVerificationEmail({ to: email, name, link });
     if (sent.mode === "unconfigured") {
-      await sql`DELETE FROM app_users WHERE id = ${userId}`;
-      await sql`DELETE FROM tenants WHERE id = ${tenantId}`;
+      await sql`
+        UPDATE app_users
+        SET email_verified_at = now(),
+            verification_token_hash = NULL,
+            verification_expires_at = NULL
+        WHERE id = ${userId}
+      `;
       return {
-        ok: false,
-        status: 503,
-        error: "Email is not configured yet. Set GMAIL_USER and GMAIL_APP_PASSWORD.",
+        ok: true,
+        email,
+        signedIn: true,
+        user: {
+          id: userId,
+          tenantId,
+          username: email,
+          displayName: name,
+          role: "admin",
+        },
       };
     }
   } catch (error) {
@@ -101,7 +124,7 @@ export async function registerAccount(
     return { ok: false, status: 502, error: `Could not send the verification email. ${message}` };
   }
 
-  return { ok: true, email };
+  return { ok: true, email, signedIn: false };
 }
 
 export async function verifyEmailToken(

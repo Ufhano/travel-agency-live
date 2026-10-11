@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, Lock, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function RegisterForm() {
+  const router = useRouter();
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -28,9 +30,15 @@ export function RegisterForm() {
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         email?: string;
+        signedIn?: boolean;
       };
       if (!res.ok) {
         setError(data.error ?? "Could not create the account.");
+        return;
+      }
+      if (data.signedIn) {
+        router.replace("/");
+        router.refresh();
         return;
       }
       setSentTo(data.email ?? email);

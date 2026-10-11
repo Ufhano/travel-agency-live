@@ -18,6 +18,9 @@ export function LayoutRouter({
   const isPublic =
     pathname === "/book" ||
     pathname.startsWith("/book/") ||
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/verify" ||
     pathname.startsWith("/api/public/");
 
   if (isPublic) {
