@@ -90,7 +90,7 @@ export async function GET() {
     id: string;
     name: string;
     destination: string;
-    departure_date: string;
+    departure_date: string | Date;
   }[];
 
   const trips = rows.map((r) => {
