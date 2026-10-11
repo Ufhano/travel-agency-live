@@ -4,7 +4,7 @@ import {
   bootstrapMemoryAuth,
 } from "@backend/auth-memory";
 import { getSql } from "@backend/db";
-import { authenticateUser, ensureAuthReady } from "@backend/users";
+import { authenticateUser, EmailNotVerifiedError, ensureAuthReady } from "@backend/users";
 import { getAuthSecretForNode } from "@/lib/auth-secret-node";
 import {
   SESSION_COOKIE,
@@ -78,6 +78,15 @@ export async function POST(request: Request) {
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(7 * 24 * 60 * 60));
     return res;
   } catch (e) {
+    if (e instanceof EmailNotVerifiedError) {
+      return NextResponse.json(
+        {
+          error:
+            "Confirm your email before you sign in. Use the link we sent you.",
+        },
+        { status: 403 },
+      );
+    }
     console.error("[api/auth/login]", e);
     const detail = e instanceof Error ? e.message : String(e);
     return NextResponse.json(

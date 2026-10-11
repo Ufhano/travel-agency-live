@@ -1,4 +1,4 @@
-const FALLBACK_KEY = "nendila-session-v1";
+const FALLBACK_KEY = "travel-agency-session-v1";
 
 async function hmacSha256Hex(message: string, keyMaterial: string): Promise<string> {
   const enc = new TextEncoder();
@@ -29,5 +29,5 @@ export async function resolveAuthSecret(): Promise<string> {
     throw new Error("Set AUTH_SECRET in Vercel environment variables.");
   }
 
-  return "dev-nendila-auth-secret-change-me";
+  return "dev-travel-agency-auth-secret-change-me";
 }

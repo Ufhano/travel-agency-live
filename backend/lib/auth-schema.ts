@@ -41,6 +41,15 @@ export async function ensureAuthSchema(sql: SqlExecutor): Promise<void> {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_app_users_tenant ON app_users (tenant_id)`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS verification_token_hash TEXT`;
+  await sql`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS verification_expires_at TIMESTAMPTZ`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email
+    ON app_users (email)
+    WHERE email IS NOT NULL
+  `;
   await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS tenant_id TEXT`;
   await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS tenant_id TEXT`;
   await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS tenant_id TEXT`;

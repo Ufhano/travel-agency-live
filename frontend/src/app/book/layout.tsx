@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Book your trip — Nendila Travel & Explorers",
+  title: "Book your trip — Travel Agency",
   description: "Reserve your seat on our featured departure and pay securely with Yoco.",
 };
 

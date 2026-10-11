@@ -152,7 +152,7 @@ export function InvoiceToolbar({
         `Amount paid: ${formatZAR(amount)}`,
         `Outstanding: ${formatZAR(balance)}`,
         "",
-        "Thank you for travelling with Nendila Travel & Explorers.",
+        "Thank you for travelling with us.",
       ].join("\n");
 
       const shareData: ShareData = {

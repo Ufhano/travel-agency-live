@@ -1,7 +1,7 @@
 import { createHmac } from "crypto";
 import { resolveAuthSecret } from "@/lib/auth-secret-shared";
 
-const FALLBACK_KEY = "nendila-session-v1";
+const FALLBACK_KEY = "travel-agency-session-v1";
 
 /** Node-only sync wrapper for API routes. */
 export function getAuthSecretForNode(): string {
@@ -17,7 +17,7 @@ export function getAuthSecretForNode(): string {
     throw new Error("Set AUTH_SECRET in Vercel environment variables.");
   }
 
-  return "dev-nendila-auth-secret-change-me";
+  return "dev-travel-agency-auth-secret-change-me";
 }
 
 export { resolveAuthSecret };

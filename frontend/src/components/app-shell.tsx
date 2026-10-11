@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   FileText,
@@ -103,19 +102,7 @@ export function AppShell({
             )}
           >
             <span className="flex min-h-9 flex-1 items-center gap-2.5 px-2.5 py-1.5 sm:min-h-10 sm:gap-3 sm:px-3 sm:py-2">
-              <span className="relative h-8 w-[7.25rem] shrink-0 sm:h-9 sm:w-[8.75rem]">
-                <Image
-                  src="/nendila-logo.png"
-                  alt="Nendila Travel & Explorers"
-                  fill
-                  className={cn(
-                    "object-contain object-left",
-                    "mix-blend-multiply contrast-105 dark:mix-blend-normal dark:contrast-100 dark:brightness-[1.06]",
-                  )}
-                  sizes="(max-width: 640px) 120px, 150px"
-                  priority
-                />
-              </span>
+              <span className="px-3 text-sm font-semibold tracking-tight">Travel Agency</span>
               <span
                 className="hidden h-6 w-px shrink-0 bg-border/70 sm:block"
                 aria-hidden

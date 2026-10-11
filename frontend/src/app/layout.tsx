@@ -19,13 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Nendila Travel Explorers — Operations',
+  title: 'Travel Agency — Operations',
   description:
-    'Internal operations preview: live departures, payment tracking, balances, and one immutable invoice per payment.',
-  icons: {
-    icon: [{url: '/nendila-logo.png', type: 'image/png'}],
-    apple: [{url: '/nendila-logo.png', type: 'image/png'}],
-  },
+    'Operations: live departures, payment tracking, balances, and one invoice per payment.',
 };
 
 export const dynamic = "force-dynamic";

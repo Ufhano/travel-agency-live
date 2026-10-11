@@ -6,9 +6,13 @@ import { verifySessionToken } from "@/lib/auth-edge";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/register",
+  "/verify",
   "/book",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/register",
+  "/api/auth/verify",
   "/api/public",
   "/api/db-health",
   "/manifest.json",
@@ -26,7 +30,7 @@ export async function middleware(request: NextRequest) {
   );
 
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    if (pathname === "/login" && session) {
+    if ((pathname === "/login" || pathname === "/register") && session) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     return NextResponse.next();

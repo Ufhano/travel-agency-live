@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +22,6 @@ async function ConfirmedContent({
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16 text-center">
-      <Image
-        src="/nendila-logo.png"
-        alt=""
-        width={56}
-        height={56}
-        className="mx-auto mb-6"
-      />
       <h1 className="text-2xl font-bold">Thank you!</h1>
       <p className="mt-3 text-muted-foreground leading-relaxed">
         Your payment is being processed. You&apos;ll receive a confirmation email shortly once

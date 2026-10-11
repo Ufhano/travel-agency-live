@@ -45,7 +45,7 @@ export function LoginForm({ defaultUsername }: { defaultUsername: string }) {
     <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-2">
         <Label htmlFor="username" className="text-teal-950/80">
-          Username
+          Email
         </Label>
         <div className="relative">
           <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600/50" />
@@ -53,6 +53,8 @@ export function LoginForm({ defaultUsername }: { defaultUsername: string }) {
             id="username"
             name="username"
             autoComplete="username"
+            type="text"
+            placeholder="you@example.com"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="h-11 border-teal-200/80 bg-white/90 pl-10 focus-visible:ring-teal-500/40"

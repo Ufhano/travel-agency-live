@@ -1,11 +1,7 @@
-const CACHE_NAME = "nendila-v2";
+const CACHE_NAME = "travel-agency-v1";
 
 /** Only public assets — do not cache "/" (auth redirect breaks install). */
-const STATIC_ASSETS = [
-  "/manifest.json",
-  "/nendila-logo.png",
-  "/nendila-brand.png",
-];
+const STATIC_ASSETS = ["/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

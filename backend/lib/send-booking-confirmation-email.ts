@@ -20,7 +20,7 @@ function gmailAppPassword(): string | null {
 
 function fromAddress(user: string): string {
   const configured = process.env.EMAIL_FROM?.trim();
-  return configured || `Nendila Travel & Explorers <${user}>`;
+  return configured || `Travel Agency <${user}>`;
 }
 
 function firstName(fullName: string): string {
@@ -61,7 +61,7 @@ export async function sendBookingConfirmationEmail(
     "",
     "Our team will be in touch with further travel details.",
     "",
-    "Nendila Travel & Explorers",
+    "Travel Agency",
   ].join("\n");
 
   const replyTo = process.env.EMAIL_REPLY_TO?.trim() || undefined;

@@ -32,6 +32,13 @@ function slugify(name: string): string {
   return `${base}-${randomBytes(3).toString("hex")}`;
 }
 
+export class EmailNotVerifiedError extends Error {
+  constructor() {
+    super("Email not verified");
+    this.name = "EmailNotVerifiedError";
+  }
+}
+
 export async function ensureAuthReady(sql: SqlExecutor) {
   return bootstrapAdminUser(sql);
 }
@@ -43,10 +50,12 @@ export async function authenticateUser(
 ): Promise<AppUser | null> {
   await ensureAuthReady(sql);
   const rows = (await sql`
-    SELECT u.id, u.tenant_id, u.username, u.password_hash, u.display_name, u.role, u.created_at, t.name AS tenant_name
+    SELECT u.id, u.tenant_id, u.username, u.password_hash, u.display_name, u.role, u.created_at,
+           u.email, u.email_verified_at, t.name AS tenant_name
     FROM app_users u
     JOIN tenants t ON t.id = u.tenant_id
     WHERE u.username = ${username.trim().toLowerCase()}
+       OR u.email = ${username.trim().toLowerCase()}
     LIMIT 1
   `) as {
     id: string;
@@ -56,11 +65,14 @@ export async function authenticateUser(
     display_name: string;
     role: string;
     created_at: string | Date;
+    email: string | null;
+    email_verified_at: string | Date | null;
     tenant_name: string;
   }[];
 
   const row = rows[0];
   if (!row || !verifyPassword(password, row.password_hash)) return null;
+  if (row.email && !row.email_verified_at) throw new EmailNotVerifiedError();
 
   return {
     id: row.id,

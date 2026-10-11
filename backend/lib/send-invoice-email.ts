@@ -24,7 +24,7 @@ function gmailAppPassword(): string | null {
 
 function fromAddress(user: string): string {
   const configured = process.env.EMAIL_FROM?.trim();
-  return configured || `Nendila Travel & Explorers <${user}>`;
+  return configured || `Travel Agency <${user}>`;
 }
 
 function firstName(fullName: string): string {
@@ -48,7 +48,7 @@ export async function sendInvoiceEmailWithPdf(
     `Invoice number: ${input.invoiceNumber}`,
     `Trip: ${input.tripName}`,
     "",
-    "Thank you for travelling with Nendila Travel & Explorers.",
+    "Thank you for travelling with us.",
   ].join("\n");
 
   const replyTo = process.env.EMAIL_REPLY_TO?.trim() || undefined;

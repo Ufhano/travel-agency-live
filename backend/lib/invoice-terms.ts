@@ -14,7 +14,7 @@ export const DEFAULT_INVOICE_TERMS: string[] = [
   "Cancellations due to what so ever reason when everything has been booked results to no refund, the only option available is for you to get a replacement from your side.",
   "No moving from one date to another or from one trip to another unless when we suggest it.",
   "Please note that it is your responsibility to make sure that you have a valid passport during the time of travelling.",
-  "Note that the activities are not compulsory and Nendila Travel & Explorers will not be held responsible for any damages, loss and accidents that may occur during the activities.",
+  "Note that the activities are not compulsory and the agency will not be held responsible for any damages, loss and accidents that may occur during the activities.",
 ];
 
 export const MAX_INVOICE_TERMS = 40;

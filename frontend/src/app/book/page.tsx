@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { PublicBookingForm } from "@/components/public-booking-form";
@@ -100,15 +99,7 @@ export default async function BookPage() {
               </div>
             </section>
           ) : (
-            <div className="relative aspect-[16/9] overflow-hidden rounded-xl border bg-muted flex items-center justify-center">
-              <Image
-                src="/nendila-logo.png"
-                alt="Nendila Travel"
-                width={120}
-                height={120}
-                className="opacity-40"
-              />
-            </div>
+            <div className="relative aspect-[16/9] overflow-hidden rounded-xl border bg-muted" />
           )}
         </div>
 
@@ -129,8 +120,7 @@ function PublicBookShell({ children }: { children: React.ReactNode }) {
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <header className="mb-10 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Image src="/nendila-logo.png" alt="" width={40} height={40} />
-          <span className="font-semibold text-lg">Nendila Travel &amp; Explorers</span>
+          <span className="font-semibold text-lg">Travel Agency</span>
         </div>
         <Link
           href="/login"
