@@ -1,6 +1,7 @@
 import {NextResponse} from 'next/server';
 
 import {ensureTripsForImportGroups} from '@backend/ensure-import-trips';
+import {saveImportExtractToNeon} from '@backend/import-save';
 import {getSql} from '@backend/db';
 import type {
   ImportExtractResult,
@@ -18,6 +19,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MAX_BYTES = 6 * 1024 * 1024;
+const SAMPLE_SPREADSHEET = 'dummy-travellers.xlsx';
 
 type DocFormat = 'spreadsheet' | 'pdf' | 'word';
 
@@ -187,10 +189,31 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
+    let savedCount = 0;
+    if (
+      session &&
+      sql &&
+      tripSync &&
+      name.toLowerCase() === SAMPLE_SPREADSHEET
+    ) {
+      for (const row of rows) {
+        const tripId = tripSync.groupTripIds[importGroupKey(row)];
+        if (!tripId) continue;
+        const saved = await saveImportExtractToNeon(
+          sql,
+          session.tenantId,
+          tripId,
+          row,
+        );
+        if (saved.ok) savedCount++;
+      }
+    }
+
     return NextResponse.json({
       format,
       fileName: name,
       count: rows.length,
+      ...(savedCount > 0 ? {savedCount} : {}),
       rows,
       ...(columnMeta ? {columnMeta} : {}),
       ...(tripSync ? {tripSync} : {}),
@@ -201,7 +224,11 @@ export async function POST(request: Request): Promise<Response> {
             ? [
                 'No data rows matched. Ensure the first row has headers like Full Name, Email, Amount, etc.',
               ]
-            : tripSync && tripSync.createdCount > 0
+            : savedCount > 0
+              ? [
+                  `Saved ${savedCount} traveller(s) from the sample spreadsheet. They are on Clients and the dashboard.`,
+                ]
+              : tripSync && tripSync.createdCount > 0
               ? [
                   `Created ${tripSync.createdCount} departure(s) from worksheet tabs: ${tripSync.createdNames.slice(0, 5).join(', ')}${tripSync.createdNames.length > 5 ? '…' : ''}.`,
                 ]

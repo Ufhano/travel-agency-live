@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {Database, FileUp, Loader2, MapPin} from 'lucide-react';
+import {Database, Download, FileUp, Loader2, MapPin} from 'lucide-react';
 
 import type {ImportExtractResult} from '@backend/import-parse';
 import {Badge} from '@/components/ui/badge';
@@ -30,6 +30,7 @@ type ApiOk = {
   count: number;
   rows: ImportExtractResult[];
   warnings: string[];
+  savedCount?: number;
   tripSync?: {
     trips: TripOption[];
     groupTripIds: Record<string, string>;
@@ -375,7 +376,34 @@ export default function ImportPage() {
         else {
           const ok = json as ApiOk;
           setPayload(ok);
-          if (ok.tripSync?.trips?.length) {
+          if ((ok.savedCount ?? 0) > 0) {
+            if (ok.tripSync?.trips?.length) {
+              setTrips(ok.tripSync.trips);
+              setGroupTripIds(ok.tripSync.groupTripIds ?? {});
+            }
+            const groups = new Map<string, ImportExtractResult[]>();
+            for (const row of ok.rows) {
+              const group = importDestinationGroupKey(row);
+              const list = groups.get(group) ?? [];
+              list.push(row);
+              groups.set(group, list);
+            }
+            const keys = new Set<string>();
+            for (const [group, groupRows] of groups) {
+              groupRows.forEach((row, idx) => {
+                keys.add(makeRowKey(ok.fileName, group, idx, row));
+              });
+            }
+            setSavedKeys(keys);
+            toast(
+              `Saved ${ok.savedCount} travellers. They are on Clients and the dashboard.`,
+              'success',
+            );
+            setSaveBanner(
+              `The sample file created the departures and saved ${ok.savedCount} travellers. Uploading it again adds them again.`,
+            );
+            router.refresh();
+          } else if (ok.tripSync?.trips?.length) {
             setTrips(ok.tripSync.trips);
             setGroupTripIds(ok.tripSync.groupTripIds ?? {});
             if (ok.tripSync.createdCount > 0) {
@@ -416,6 +444,24 @@ export default function ImportPage() {
           for that trip.
         </p>
       </header>
+
+      <Card className='max-w-3xl'>
+        <CardHeader>
+          <CardTitle className='text-lg'>Sample spreadsheet</CardTitle>
+          <CardDescription>
+            Download this file, choose Spreadsheet below, then upload it. The two tabs become
+            departures and the six travellers are saved onto Clients.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant='outline' asChild>
+            <a href='/samples/dummy-travellers.xlsx' download='dummy-travellers.xlsx'>
+              <Download />
+              Download dummy spreadsheet
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card className='max-w-3xl'>
         <CardHeader>
