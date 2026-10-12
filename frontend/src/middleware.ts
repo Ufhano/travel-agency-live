@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
   "/api/db-health",
   "/manifest.json",
   "/sw.js",
+  "/samples",
 ];
 
 export async function middleware(request: NextRequest) {
