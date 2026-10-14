@@ -52,11 +52,11 @@ export function RegisterForm() {
   if (sentTo) {
     return (
       <div className="space-y-4 text-center">
-        <p className="text-sm text-teal-950">
+        <p className="text-sm text-[#1d1d1f]">
           We sent a verification link to <span className="font-semibold">{sentTo}</span>.
           Open it, then sign in.
         </p>
-        <Link href="/login" className="text-sm font-medium text-teal-700 underline">
+        <Link href="/login" className="text-sm font-medium text-[#0071e3]">
           Back to sign in
         </Link>
       </div>
@@ -66,29 +66,29 @@ export function RegisterForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="name" className="text-teal-950/80">
+        <Label htmlFor="name" className="text-[#1d1d1f]">
           Name
         </Label>
         <div className="relative">
-          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600/50" />
+          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6e6e73]" />
           <Input
             id="name"
             name="name"
             autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-11 border-teal-200/80 bg-white/90 pl-10"
+            className="h-11 rounded-xl border-[#d2d2d7] bg-white pl-10"
             disabled={loading}
             required
           />
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-teal-950/80">
+        <Label htmlFor="email" className="text-[#1d1d1f]">
           Email
         </Label>
         <div className="relative">
-          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600/50" />
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6e6e73]" />
           <Input
             id="email"
             name="email"
@@ -96,18 +96,18 @@ export function RegisterForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-11 border-teal-200/80 bg-white/90 pl-10"
+            className="h-11 rounded-xl border-[#d2d2d7] bg-white pl-10"
             disabled={loading}
             required
           />
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-teal-950/80">
+        <Label htmlFor="password" className="text-[#1d1d1f]">
           Password
         </Label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600/50" />
+          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6e6e73]" />
           <Input
             id="password"
             name="password"
@@ -115,7 +115,7 @@ export function RegisterForm() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-11 border-teal-200/80 bg-white/90 pl-10"
+            className="h-11 rounded-xl border-[#d2d2d7] bg-white pl-10"
             placeholder="At least 8 characters"
             disabled={loading}
             required
@@ -131,7 +131,7 @@ export function RegisterForm() {
       <Button
         type="submit"
         disabled={loading}
-        className="h-11 w-full rounded-xl bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-600 text-base font-semibold text-white"
+        className="h-11 w-full rounded-full bg-[#0071e3] text-base font-semibold text-white hover:bg-[#0077ed]"
       >
         {loading ? (
           <>

@@ -3,32 +3,23 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  MapPin,
-  Settings,
-  Split,
-  Upload,
-  Users,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isSuperuser } from "@backend/roles";
 import type { ClientSession } from "@/lib/session-token";
 
 const baseNav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/group-bookings", label: "Group Split", icon: Split },
-  { href: "/invoices", label: "Invoices", icon: FileText },
-  { href: "/trips", label: "Trips", icon: MapPin },
+  { href: "/", label: "Dashboard", icon: "/icons/apple/launchpad.png" },
+  { href: "/clients", label: "Clients", icon: "/icons/apple/contacts.png" },
+  { href: "/group-bookings", label: "Group Split", icon: "/icons/apple/messages.png" },
+  { href: "/invoices", label: "Invoices", icon: "/icons/apple/numbers.png" },
+  { href: "/trips", label: "Trips", icon: "/icons/apple/maps.png" },
 ];
 
 const superuserNav = [
-  { href: "/import", label: "Import", icon: Upload },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/import", label: "Import", icon: "/icons/apple/folder.png" },
+  { href: "/settings", label: "Settings", icon: "/icons/apple/settings.png" },
 ];
 
 export function AppShell({
@@ -87,73 +78,87 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="no-print sticky top-0 z-40 border-b border-border/60 bg-card/75 backdrop-blur-md supports-[backdrop-filter]:bg-card/65">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6">
-          <Link
-            href="/"
-            className={cn(
-              "flex min-h-9 max-w-[min(100%,20rem)] flex-1 shrink items-center gap-0 sm:max-w-none sm:flex-none sm:gap-0",
-              "rounded-xl border border-border/80 bg-gradient-to-b from-card to-card/90 text-card-foreground shadow-sm",
-              "ring-1 ring-black/[0.03] transition-[border-color,box-shadow,background-color] duration-200",
-              "hover:border-border hover:shadow-md",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              "dark:from-card dark:to-muted/25 dark:ring-white/[0.06]",
-            )}
+    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+      <aside className="no-print fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-black/[0.06] bg-white/72 px-3 py-4 backdrop-blur-2xl md:flex">
+        <Link href="/" className="px-2.5 pb-4 pt-1">
+          <span className="block text-[15px] font-semibold tracking-tight">Travel Agency</span>
+          <span className="mt-0.5 block truncate text-[12px] text-[#6e6e73]">
+            {session?.displayName ?? "Operations"}
+            {" · "}
+            {isSuperuser(session?.role) ? "Superuser" : "User"}
+          </span>
+        </Link>
+        <nav className="flex flex-1 flex-col gap-0.5">
+          {links.map((item) => (
+            <ShellLink key={item.href} item={item} pathname={pathname} />
+          ))}
+        </nav>
+        {signedIn || authEnabled ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-3 justify-start gap-3 rounded-xl px-2.5 text-[13px] text-[#6e6e73] hover:bg-black/[0.04] hover:text-[#1d1d1f]"
+            onClick={() => void signOut()}
           >
-            <span className="flex min-h-9 flex-1 items-center gap-2.5 px-2.5 py-1.5 sm:min-h-10 sm:gap-3 sm:px-3 sm:py-2">
-              <span className="px-3 text-sm font-semibold tracking-tight">Travel Agency</span>
-              <span
-                className="hidden h-6 w-px shrink-0 bg-border/70 sm:block"
-                aria-hidden
-              />
-              <span className="hidden min-w-0 flex-col items-start gap-0.5 sm:flex lg:pr-0.5">
-                <span className="text-[11px] font-semibold leading-none tracking-tight text-foreground/90">
-                  {session?.displayName ?? "Operations"}
-                </span>
-                <span className="text-[10px] font-normal leading-none text-muted-foreground">
-                  {isSuperuser(session?.role) ? "Superuser" : "User"}
-                </span>
-              </span>
-            </span>
-          </Link>
-          <nav className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-            {links.map(({ href, label, icon: Icon }) => {
-              const active =
-                href === "/" ? pathname === "/" : pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:px-3",
-                    active
-                      ? "bg-muted/90 text-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0 opacity-90" />
-                  <span className="hidden md:inline">{label}</span>
-                </Link>
-              );
-            })}
-            {signedIn || authEnabled ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="ml-1 text-muted-foreground hover:text-foreground"
-                onClick={() => void signOut()}
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden lg:inline">Sign out</span>
-              </Button>
-            ) : null}
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</main>
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
+        ) : null}
+      </aside>
+
+      <nav className="no-print fixed inset-x-3 bottom-3 z-40 flex items-end justify-between gap-1 overflow-x-auto rounded-[22px] border border-white/70 bg-white/75 px-2 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-2xl md:hidden">
+        {links.map((item) => (
+          <ShellLink key={item.href} item={item} pathname={pathname} compact />
+        ))}
+        {signedIn || authEnabled ? (
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            title="Sign out"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#6e6e73]"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        ) : null}
+      </nav>
+
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-28 md:ml-[232px] md:px-8 md:pb-10">
+        {children}
+      </main>
     </div>
+  );
+}
+
+function ShellLink({
+  item,
+  pathname,
+  compact = false,
+}: {
+  item: { href: string; label: string; icon: string };
+  pathname: string;
+  compact?: boolean;
+}) {
+  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+  return (
+    <Link
+      href={item.href}
+      title={item.label}
+      className={cn(
+        "flex items-center gap-3 rounded-xl text-[13px] font-medium transition-colors",
+        compact ? "min-w-0 flex-1 flex-col gap-1 px-1 py-1" : "px-2 py-1.5",
+        active ? "bg-black/[0.06]" : "hover:bg-black/[0.04]",
+      )}
+    >
+      <img
+        src={item.icon}
+        alt=""
+        width={32}
+        height={32}
+        className={cn("shrink-0 object-contain", compact ? "h-7 w-7" : "h-8 w-8")}
+      />
+      <span className={cn(compact ? "max-w-full truncate text-[10px] leading-none text-[#6e6e73]" : "truncate")}>
+        {compact ? item.label.split(" ")[0] : item.label}
+      </span>
+    </Link>
   );
 }

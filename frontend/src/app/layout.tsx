@@ -42,7 +42,7 @@ export default async function RootLayout({
     <html lang='en'>
       <head>
         <link rel='manifest' href='/manifest.json' />
-        <meta name='theme-color' content='#000000' />
+        <meta name='theme-color' content='#f5f5f7' />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans`}>
         <ServiceWorkerRegister />

@@ -173,7 +173,7 @@ function PaymentProgressRing({
 
       <div className='absolute inset-0 flex flex-col items-center justify-center text-center text-white'>
         <div className='mb-3 inline-flex items-center gap-1.5 rounded-full bg-black/35 px-3 py-1 text-[11px] font-medium backdrop-blur-sm'>
-          <ShieldCheck className='h-3.5 w-3.5 text-teal-300' />
+          <ShieldCheck className='h-3.5 w-3.5 text-sky-300' />
           <span>{asOfLabel}</span>
         </div>
 
@@ -182,7 +182,7 @@ function PaymentProgressRing({
             {formatZAR(displayPaid)}
           </span>
           {outstanding > 0 ? (
-            <span className='rounded-full bg-teal-400/20 px-2 py-0.5 text-xs font-semibold text-teal-200'>
+            <span className='rounded-full bg-sky-400/20 px-2 py-0.5 text-xs font-semibold text-sky-100'>
               −{formatZAR(outstanding)}
             </span>
           ) : null}
@@ -195,7 +195,7 @@ function PaymentProgressRing({
         <Button
           asChild
           size='sm'
-          className='mt-5 gap-1.5 rounded-full bg-teal-300/90 px-5 text-teal-950 hover:bg-teal-200'
+          className='mt-5 gap-1.5 rounded-full bg-white px-5 text-[#1d1d1f] hover:bg-white/90'
         >
           <Link href='#departures'>
             View departures
@@ -241,7 +241,7 @@ export function DashboardPaymentHero({
             "url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1600&q=80')",
         }}
       />
-      <div className='absolute inset-0 bg-gradient-to-br from-slate-950/85 via-slate-900/75 to-teal-950/80 backdrop-blur-[2px]' />
+      <div className='absolute inset-0 bg-gradient-to-br from-slate-950/85 via-slate-900/75 to-blue-950/80 backdrop-blur-[2px]' />
 
       <div className='relative z-10 flex flex-col gap-8 px-6 py-10 sm:px-10 lg:flex-row lg:items-center lg:justify-between lg:gap-12 lg:py-12'>
         <div className='max-w-lg text-white'>
@@ -253,14 +253,14 @@ export function DashboardPaymentHero({
           </h2>
           <p className='mt-4 text-sm leading-relaxed text-white/65 sm:text-base'>
             Across {tripLabel}, travellers have paid{' '}
-            <span className='font-semibold text-teal-200'>{percentPaid}%</span>{' '}
+            <span className='font-semibold text-sky-200'>{percentPaid}%</span>{' '}
             of booked package value. Track collections and outstanding balances
             from one place.
           </p>
 
           <div className='mt-6 flex flex-wrap gap-3 text-sm'>
             <div className='inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur-sm'>
-              <PiggyBank className='h-4 w-4 text-teal-300' />
+              <PiggyBank className='h-4 w-4 text-sky-300' />
               <span>
                 <span className='font-semibold'>{formatZAR(paid)}</span>{' '}
                 collected

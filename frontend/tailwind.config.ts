@@ -54,7 +54,16 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        sans: [
+          "SF Pro Text",
+          "SF Pro Display",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Helvetica Neue",
+          "var(--font-geist-sans)",
+          "sans-serif",
+        ],
         mono: ["var(--font-geist-mono)", "monospace"],
       },
     },

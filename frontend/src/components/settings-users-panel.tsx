@@ -278,7 +278,7 @@ export function SettingsUsersPanel() {
                         Delete
                       </Button>
                     ) : (
-                      <span className="text-xs font-medium text-teal-700">Protected</span>
+                      <span className="text-xs font-medium text-[#0071e3]">Protected</span>
                     )}
                   </div>
                 </li>

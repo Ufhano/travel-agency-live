@@ -44,11 +44,11 @@ export function LoginForm({ defaultUsername }: { defaultUsername: string }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="username" className="text-teal-950/80">
+        <Label htmlFor="username" className="text-[#1d1d1f]">
           Email
         </Label>
         <div className="relative">
-          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600/50" />
+          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6e6e73]" />
           <Input
             id="username"
             name="username"
@@ -57,18 +57,18 @@ export function LoginForm({ defaultUsername }: { defaultUsername: string }) {
             placeholder="you@example.com"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="h-11 border-teal-200/80 bg-white/90 pl-10 focus-visible:ring-teal-500/40"
+            className="h-11 rounded-xl border-[#d2d2d7] bg-white pl-10 focus-visible:ring-[#0071e3]/30"
             disabled={loading}
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-teal-950/80">
+        <Label htmlFor="password" className="text-[#1d1d1f]">
           Password
         </Label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600/50" />
+          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6e6e73]" />
           <Input
             id="password"
             name="password"
@@ -76,7 +76,7 @@ export function LoginForm({ defaultUsername }: { defaultUsername: string }) {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-11 border-teal-200/80 bg-white/90 pl-10 focus-visible:ring-teal-500/40"
+            className="h-11 rounded-xl border-[#d2d2d7] bg-white pl-10 focus-visible:ring-[#0071e3]/30"
             placeholder="••••••••"
             disabled={loading}
           />
@@ -92,7 +92,7 @@ export function LoginForm({ defaultUsername }: { defaultUsername: string }) {
       <Button
         type="submit"
         disabled={loading}
-        className="h-11 w-full rounded-xl bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-600 text-base font-semibold text-white shadow-lg shadow-teal-500/25 hover:from-teal-600 hover:via-cyan-600 hover:to-teal-700"
+        className="h-11 w-full rounded-full bg-[#0071e3] text-base font-semibold text-white hover:bg-[#0077ed]"
       >
         {loading ? (
           <>
